@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.select.R 19 2010-08-06 15:06:01Z mariotomo $
+## $Id: runit.select.R 22 2010-08-09 12:41:03Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -228,13 +228,6 @@ test.putitem.delftfews.character <- function() {
   FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
   FWS['a'] <- 5:8
   checkEqualsNumeric(5:8, FWS['a'])
-}
-
-test.putcolumn.zoo.respects.derived.classes <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  checkTrue("delftfews" %in% class(FWS))
-  FWS$a <- 4:7
-  checkTrue("delftfews" %in% class(FWS))
 }
 
 test.putitem.delftfews.character.new.column <- function() {
