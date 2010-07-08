@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: rezoo.R 28 2010-08-11 12:15:43Z mariotomo $
+## $Id: rezoo.R 34 2010-08-13 13:32:40Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -30,7 +30,7 @@
   rval <- coredata(x)
   n <- NROW(rval)
   n2 <- if(nargs() == 1) length(as.vector(rval)) else n
-  if(missing(i)) i <- 1:n
+  if(missing(i)) i <- seq_len(n)
 
   ## also support that i can be index:
   ## if i is not numeric/integer/logical, it is interpreted to be the index

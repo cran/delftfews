@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: augment.R 28 2010-08-11 12:15:43Z mariotomo $
+## $Id: augment.R 34 2010-08-13 13:32:40Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -74,7 +74,7 @@ cumulate.timeseries <- function(input, column="input", gap=1, integration.method
   ## 4: simpson's.  the methods are implemented taking into account
   ## the two 0 measurements outside the stretch under examination.
 
-  result <- data.frame(row.names=1:nrow(input))
+  result <- data.frame(row.names=seq_len(NROW(input)))
   result[[paste(column, 'gross', 'partials', sep='.')]] <- NA
   result[[paste(column, 'gross', 'totals', sep='.')]] <- NA
   result[[paste(column, 'gross', 'duration', sep='.')]] <- NA
