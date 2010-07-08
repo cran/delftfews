@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: diagnostics.R 4 2010-07-08 10:36:09Z mariotomo $
+## $Id: diagnostics.R 60 2011-02-02 12:41:26Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -24,6 +24,15 @@
 ## initial date       :  20091120
 ##
 
+toValidXmlString <- function(s) {
+  s <- gsub("&", "&amp;", s)
+  s <- gsub("<", "&lt;", s)
+  s <- gsub(">", "&gt;", s)
+  s <- gsub('"', "&quot;", s)
+  s <- gsub("'", "&apos;", s)
+  s
+}
+
 formatter.fewsdiagnostics <- function(record) {
   if(record$level <= loglevels[['INFO']])
     level <- 3
@@ -34,7 +43,7 @@ formatter.fewsdiagnostics <- function(record) {
   else
     level <- 0
 
-  sprintf('  <line level="%d" description="LizardScripter :: %s :: %s"/>\n', level, record$timestamp, record$msg)
+  sprintf('  <line level="%d" description="LizardScripter :: %s :: %s"/>\n', level, record$timestamp, toValidXmlString(record$msg))
 }
 
 setup.fewsdiagnostics <- function(filename) {
@@ -45,7 +54,8 @@ setup.fewsdiagnostics <- function(filename) {
              formatter=formatter.fewsdiagnostics)
 }
 
-teardown.fewsdiagnostics <- function(filename) {
+teardown.fewsdiagnostics <- function(...) {
+  filename <- with(getHandler("diagnostics", logger = "fews.diagnostics"), file)
   cat('</Diag>\n', file=filename, append=TRUE)
   removeHandler('diagnostics', logger='fews.diagnostics')
 }

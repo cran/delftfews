@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: select.R 38 2010-08-24 13:59:29Z mariotomo $
+## $Id: select.R 66 2011-03-14 13:48:29Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -115,7 +115,7 @@ select.percentiles <- function(input, percentiles, score.function=sum.first, ...
   if(all(is.na(tempdata))) {
     ## return the desired amount of columns, filled with NA and
     ## timestamped as the input.
-    columns <- seq_len(length(percentiles))
+    columns <- seq_along(percentiles)
     result <- input[, columns]
     result[] <- NA
   } else {

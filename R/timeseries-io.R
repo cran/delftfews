@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: timeseries-io.R 35 2010-08-16 07:04:24Z mariotomo $
+## $Id: timeseries-io.R 67 2011-03-14 14:20:45Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -137,7 +137,7 @@ read.PI <- function(filename, step.seconds=NA, na.action=na.fill) {
   }
 
   ## column-bind the timestamps to the collected values
-  result <- zoo(cbind(mapply(getValues, seriesNodes)), order.by=result.index)
+  result <- zoo(cbind(mapply(getValues, seriesNodes)), order.by=result.index, frequency=1.0/step.seconds)
   class(result) <- c("delftfews", class(result))
   return(result)
 }
@@ -161,7 +161,7 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
   ##1 instantaneous 155 Ai2 -999.0 m^3/min result
   ##2 instantaneous 156 Ai3 -999.0 mmHg check
 
-  timeStep <- get.step(index(data))
+  timeStep <- get.step(data)
 
   looksLikeNULL <- function(object, name) {
     if(!(name %in% names(object)))
@@ -182,7 +182,7 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
 
     ## cut uninteresting columns
     actualdata <- data.frame(seconds = as.seconds(index(data)))
-    actualdata$column <- data[item['column'], drop=TRUE]
+    actualdata$column <- as.vector(data[item['column']])
     ## cut rows that generate no 'event' node.
     if(looksLikeNULL(item, 'missVal')) {
       actualdata <- subset(actualdata, !is.na(column))
@@ -224,10 +224,16 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
         xmlNode(name = 'event', attrs=c(date=tsDate(ts), time=tsTime(ts), value=value, flag=0))
     }
 
+    ## timeStep
+    ## Time step for typical profile if variable to be defined for the historical event.
+    ## Attributes:
+    ## -unit: enumeration of: second, minute, hour, day, week, nonequidistant
+    ## -multiplier: defines the number of units given above in a time step (not relevant for nonequidistant time steps)
+    ## -divider: same function as the multiplier, but defines fraction of units in time step.
     if(nrow(data) != nrow(actualdata)) # we removed rows
       timeStepNode <- xmlNode('timeStep', attrs=c(unit="nonequidistant"))
     else
-      timeStepNode <- xmlNode('timeStep', attrs=c(unit="seconds", multiplier=timeStep))
+      timeStepNode <- xmlNode('timeStep', attrs=c(unit="second", multiplier=timeStep))
 
     headerNode <- xmlNode('header',
                           xmlNode('type', item[['type']]),
@@ -265,7 +271,7 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
   }
   TimeSeriesNode <- addChildren(TimeSeriesNode, kids=apply(data.description, 1, CreateSeriesNode))
 
-  saveXML(TimeSeriesNode, file=filename)
+  saveXML(TimeSeriesNode, file=filename, prefix = '<?xml version="1.0" encoding="UTF-8"?>\n')
 }
 
 read.BfG <- function(filename, column="value") {

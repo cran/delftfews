@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.select.R 37 2010-08-23 13:17:45Z mariotomo $
+## $Id: runit.select.R 41 2010-09-30 10:30:20Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -17,7 +17,7 @@
 ## <http://www.gnu.org/licenses/>.
 ##
 
-require(RUnit)
+require(svUnit)
 
 EPOCH <- delftfews:::EPOCH
 

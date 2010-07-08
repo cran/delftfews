@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.augment.R 29 2010-08-11 13:24:18Z mariotomo $
+## $Id: runit.augment.R 67 2011-03-14 14:20:45Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -17,14 +17,14 @@
 ## <http://www.gnu.org/licenses/>.
 ##
 
-require(RUnit)
+require(svUnit)
 
 EPOCH <- delftfews:::EPOCH
 
 test.timeseries.base <- function() {
   ## test equality except dimnames
   minutes <- (0:5) * 720
-  target <- zoo(data.frame(), as.POSIXct(minutes * 60, origin=EPOCH))
+  target <- zoo(data.frame(), as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
   class(target) <- c("delftfews", class(target))
   current <- timeseries(from=0, by=720*60, length.out=6)
   checkEqualsNumeric(target, current)
@@ -40,7 +40,7 @@ test.timeseries.dimnames <- function() {
 
 test.timeseries.with.one.column <- function() {
   minutes <- (0:5) * 720
-  target <- zoo(data.frame(a=1), as.POSIXct(minutes * 60, origin=EPOCH))
+  target <- zoo(data.frame(a=1), as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
   dimnames(target) <- list(NULL, dimnames(target)[[2]])
   class(target) <- c("delftfews", class(target))
   current <- timeseries(from=0, by=720*60, length.out=6, a=1)
@@ -49,7 +49,7 @@ test.timeseries.with.one.column <- function() {
 
 test.timeseries.with.more.columns <- function() {
   minutes <- (0:5) * 720
-  target <- zoo(data.frame(a=1, b=1:6), as.POSIXct(minutes * 60, origin=EPOCH))
+  target <- zoo(data.frame(a=1, b=1:6), as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
   dimnames(target) <- list(NULL, dimnames(target)[[2]])
   class(target) <- c("delftfews", class(target))
   current <- timeseries(from=0, by=720*60, length.out=6, a=1, b=1:6)
@@ -59,7 +59,7 @@ test.timeseries.with.more.columns <- function() {
 test.timeseries.with.data.frame <- function() {
   full <- data.frame(a=1, b=1:6, c=(0:5)*4)
   minutes <- (0:5) * 720
-  target <- zoo(full, as.POSIXct(minutes * 60, origin=EPOCH))
+  target <- zoo(full, as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
   dimnames(target) <- list(NULL, dimnames(target)[[2]])
   class(target) <- c("delftfews", class(target))
   current <- timeseries(from=0, by=720*60, length.out=6, data=full)
@@ -70,7 +70,7 @@ test.timeseries.with.order.by <- function() {
   full <- data.frame(a=1, b=1:6, c=(0:5)*4)
   minutes <- (0:5) * 720
   template <- timeseries(from=0, by=720*60, length.out=6)
-  target <- zoo(full, as.POSIXct(minutes * 60, origin=EPOCH))
+  target <- zoo(full, as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
   dimnames(target) <- list(NULL, dimnames(target)[[2]])
   class(target) <- c("delftfews", class(target))
 
@@ -327,4 +327,25 @@ test.cumulate.timeseries.all.NA <- function() {
   checkEquals(target, coredata(result$input.net.totals))
   checkEquals(target, coredata(result$input.gross.duration))
   checkEquals(target, coredata(result$input.net.duration))
+}
+
+test.add.column.to.empty <- function() {
+  pidata <- timeseries(to=21000000*60, by=10800, length.out=1)
+  target <- c(12)
+  pidata$z <- target
+  checkEquals(target, as.vector(pidata$z))
+}
+
+test.add.column.to.single.column <- function() {
+  pidata <- timeseries(to=21000000*60, by=10800, length.out=1, a=1)
+  target <- c(20)
+  pidata$z <- target
+  checkEquals(target, as.vector(pidata$z))
+}
+
+test.add.column.to.multi.column <- function() {
+  pidata <- timeseries(to=21000000*60, by=10800, length.out=1, a=1, b=2)
+  target <- c(20)
+  pidata$z <- target
+  checkEquals(target, as.vector(pidata$z))
 }

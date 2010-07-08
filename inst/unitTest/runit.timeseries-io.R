@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.timeseries-io.R 28 2010-08-11 12:15:43Z mariotomo $
+## $Id: runit.timeseries-io.R 61 2011-03-11 14:28:14Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -17,7 +17,7 @@
 ## <http://www.gnu.org/licenses/>.
 ##
 
-require(RUnit)
+require(svUnit)
 
 ## testing the following non-exported functions:
 splitToNumeric <- delftfews:::splitToNumeric
@@ -250,6 +250,22 @@ test.write.PI.no.events <- function() {
   write.PI(pidata, conf, 'data/test.write.PI.no.events.current')
   expect <- readLines('data/test.write.PI.no.events.target')
   current <- readLines('data/test.write.PI.no.events.current')
+  checkEquals(current, expect)
+}
+
+test.write.PI.one.event <- function() {
+  ## timeseries set with two series, one timestamp only.
+  pidata <- timeseries(20576130*60, by=5*60, length.out=1, column1=1.1, column2=1.2)
+
+  conf <- data.frame(column=c('column1', 'column2'), type='instantaneous',
+                     locationId=c('P1201', 'P1202'), parameterId='WNS954',
+                     timeStep=5*60, startDate=20576130*60, endDate=20576175*60)
+
+  conf$missVal <- NULL # causes empty line
+
+  write.PI(pidata, conf, 'data/test.write.PI.one.event.current')
+  expect <- readLines('data/test.write.PI.one.event.target')
+  current <- readLines('data/test.write.PI.one.event.current')
   checkEquals(current, expect)
 }
 

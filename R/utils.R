@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: utils.R 32 2010-08-12 13:15:21Z mariotomo $
+## $Id: utils.R 67 2011-03-14 14:20:45Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -147,7 +147,10 @@ contiguous.stretch <- function(data, position, value=NULL, equality=TRUE) {
   return(id == id[position])
 }
 
-get.step <- function(L, require.constant=FALSE) {
+get.step <- function(L, require.constant=FALSE)
+  UseMethod('get.step')
+
+get.step.default <- function(L, require.constant=FALSE) {
   ## not exported, tested.
 
   ## returns the value of the most common difference between
@@ -163,6 +166,12 @@ get.step <- function(L, require.constant=FALSE) {
   if(require.constant && any(result != L))
     return(NA)
   return(result)
+}
+
+get.step.zoo <- function(L, require.constant=FALSE) {
+  if ('frequency' %in% names(attributes(L)))
+    return (1.0 / frequency(L))
+  return(get.step(index(L, require.constant)))
 }
 
 sum.first <- function(input, count=12) {
@@ -286,3 +295,46 @@ edit.zoo <- function(x) {
   zoo(edit(cd), order.by=index(x))
 }
 
+findLocalMax <- function(x) c(FALSE, diff(diff(x) > 0) < 0, FALSE)
+
+findLocalMin <- function(x) c(FALSE, diff(diff(x) > 0) > 0, FALSE)
+
+read.sheet <- function(file, sheet=NULL, header=TRUE, sep="\t",
+                       fileEncoding="", stringsAsFactors=FALSE, strip.white=TRUE, ...) {
+
+  if(is.null(sheet))
+    ## sheets may have different structures.  this function returns
+    ## just one of them and you must decide which one.
+    stop("you must specify the desired sheet.")
+
+  if (is.character(file)) {
+    file <- if (nzchar(fileEncoding)) 
+      file(file, "rt", encoding = fileEncoding)
+    else file(file, "rt")
+    on.exit(close(file), add=TRUE)
+  }
+  if (!inherits(file, "connection")) 
+    stop("'file' must be a character string or connection")
+  if (!isOpen(file, "rt")) {
+    open(file, "rt")
+    on.exit(close(file), add=TRUE)
+  }
+
+  LinesRaw <- readLines(file)
+  StartOfRequestedSheet <- grep(paste("--", sheet), LinesRaw, fixed=TRUE)
+  if(length(StartOfRequestedSheet) != 1)
+    stop("you cannot have more than one sheet with the same name.")
+  
+  SheetStartLines <- grepl("^-- ", LinesRaw)
+  SheetContent <- contiguous.stretch(SheetStartLines, StartOfRequestedSheet + 1, FALSE)
+
+  connection <- textConnection(LinesRaw[SheetContent])
+  on.exit(close(connection), add=TRUE)
+
+  read.table(connection, header=header, sep=sep,
+             strip.white=strip.white, stringsAsFactors=stringsAsFactors, ...)
+}
+
+diff.delftfews <- function(x, ...) {
+  diff(coredata(x))
+}

@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.utils.R 32 2010-08-12 13:15:21Z mariotomo $
+## $Id: runit.utils.R 50 2010-10-26 07:51:26Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -17,7 +17,7 @@
 ## <http://www.gnu.org/licenses/>.
 ##
 
-require(RUnit)
+require(svUnit)
 
 test.na.fill <- function() {
   checkEquals(c(1, 1, 1, 2, 3, 3, 4), na.fill(c(1, NA, NA, 2, 3, NA, 4)))
@@ -442,3 +442,74 @@ test.extremes.correct.2 <- function() {
   checkEquals(target, current)
 }
 
+test.findLocalMax.internal <- function() {
+  ## normal usage, extreme are only inside
+  values <- c(1,2,3,4,3,2,3,4,5,6,5,4,5,6,5,4)
+  target <- c(F,F,F,T,F,F,F,F,F,T,F,F,F,T,F,F)
+  current <- findLocalMax(values)
+  checkEquals(target, current)
+}
+
+test.findLocalMin.internal <- function() {
+  ## normal usage, extreme are only inside
+  values <- c(3,2,3,4,3,2,3,4,5,6,5,4,5,6,7)
+  target <- c(F,T,F,F,F,T,F,F,F,F,F,T,F,F,F)
+  current <- findLocalMin(values)
+  checkEquals(target, current)
+}
+
+test.findLocalMax.at.fronteer <- function() {
+  ## extreme at fronteer is not found
+  values <- c(1,2,3,4,3,2,3,4,5,6,5,4,5,6)
+  target <- c(F,F,F,T,F,F,F,F,F,T,F,F,F,F)
+  current <- findLocalMax(values)
+  checkEquals(target, current)
+}
+
+test.findLocalMin.at.fronteer <- function() {
+  ## extreme at fronteer is not found
+  values <- c(3,2,3,4,3,2,3,4,5,6,5,4,5,6,7,6)
+  target <- c(F,T,F,F,F,T,F,F,F,F,F,T,F,F,F,F)
+  current <- findLocalMin(values)
+  checkEquals(target, current)
+}
+
+test.read.sheet <- function() {
+  ## simple working test on configuration with two sheets
+  content <- "\
+-- ground locations
+location\tid\tid1\tunit\tx\ty
+Hoogeveen\t151\t06279\tmm/uur\t229129.85\t527083.29
+Eelde\t40_2\t06280\tmm/uur\t235449.14\t571940.82
+'Nieuw Beerta'\t1320\t06286\tmm/uur\t273805.36\t579493.47
+
+-- globals
+loglevelname\tloglevel
+DEBUG\t10
+"
+  target <- structure(list(location = structure(c(2L, 1L, 3L),
+                             .Label = c("Eelde", "Hoogeveen", "Nieuw Beerta"),
+                             class = "factor"),
+                           id = structure(c(2L, 3L, 1L),
+                             .Label = c("1320", "151", "40_2"),
+                             class = "factor"),
+                           id1 = c(6279L, 6280L, 6286L),
+                           unit = structure(c(1L, 1L, 1L),
+                             .Label = "mm/uur",
+                             class = "factor"),
+                           x = c(229129.85, 235449.14, 273805.36),
+                           y = c(527083.29, 571940.82, 579493.47)),
+                      .Names = c("location", "id", "id1", "unit", "x", "y"),
+                      class = "data.frame",
+                      row.names = c(NA, -3L))
+  current <- read.sheet(textConnection(content), "ground locations", stringsAsFactors=TRUE)
+  checkEquals(target, current)
+
+  target <- structure(list(loglevelname = structure(1L, .Label = "DEBUG", class = "factor"),
+                           loglevel = 10L),
+                      .Names = c("loglevelname", "loglevel"),
+                      class = "data.frame",
+                      row.names = c(NA, -1L))
+  current <- read.sheet(textConnection(content), "globals", stringsAsFactors=TRUE)
+  checkEquals(target, current)
+}

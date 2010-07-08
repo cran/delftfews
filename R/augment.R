@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: augment.R 34 2010-08-13 13:32:40Z mariotomo $
+## $Id: augment.R 67 2011-03-14 14:20:45Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -29,6 +29,7 @@ timeseries <- function(from=NULL, to=NULL, by=NULL, length.out=NULL, order.by=NU
 
   if(!is.null(order.by)) {
     timestamps <- order.by
+    by <- get.step(timestamps)
   } else {
 
     from <- as.seconds(from)
@@ -45,7 +46,7 @@ timeseries <- function(from=NULL, to=NULL, by=NULL, length.out=NULL, order.by=NU
     timestamps <- as.POSIXct.seconds(seq(from=from, to=to, by=by), origin=EPOCH)
   }
 
-  result <- zoo(data.frame(...), order.by=timestamps)
+  result <- zoo(data.frame(...), order.by=timestamps, frequency=1.0/by)
   ## we make no use of rowname information, they only confuse our tests.
   rownames(result) <- NULL
   ## following trick allows us override specific methods
