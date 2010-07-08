@@ -1,5 +1,5 @@
 % File src/R/man/rollingSum.Rd
-% $Id: rollingSum.Rd 30 2010-08-11 13:51:42Z mariotomo $
+% $Id: rollingSum.Rd 31 2010-08-12 11:43:25Z mariotomo $
 
 \name{rollingSum}
 \alias{rollingSum}
@@ -13,6 +13,9 @@
 
   `zoo::rollapply` does not define a default method.  we do so in the
   package delftfews.
+
+  `rollapply.delftfews` overrides `rollapply.zoo` defaults for `na.pad`
+  (set to TRUE) and `align` (set to 'right').
 
 }
 \usage{

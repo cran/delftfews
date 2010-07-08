@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: utils.R 28 2010-08-11 12:15:43Z mariotomo $
+## $Id: utils.R 32 2010-08-12 13:15:21Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -101,10 +101,10 @@ stretches <- function(input, gap=1, what="start", zero.surrounded=FALSE) {
   return(result)
 }
 
-rollapply.delftfews <- function(data, ...) {
+rollapply.delftfews <- function(data, ..., na.pad=TRUE, align='right') {
   class.data <- class(data)
   index.data <- index(data)
-  result <- NextMethod(na.pad=TRUE, align='right')
+  result <- NextMethod(na.pad=na.pad, align=align)
   class(result) <- class.data
   index(result) <- index.data
   return(result)
@@ -196,19 +196,26 @@ rollapply.default <- function(data, width, FUN, ...) {
   }
 }
 
-double.threshold <- function(data, threshold.false, threshold.true, initial.status)
+double.threshold <- function(data, threshold.false, threshold.true, initial.status=FALSE, on.equality=FALSE)
   UseMethod('double.threshold')
 
-double.threshold.default <- function(data, threshold.false, threshold.true, initial.status=FALSE) {
+double.threshold.default <- function(data, threshold.false, threshold.true, initial.status=FALSE, on.equality=FALSE) {
   ## double threshold test.
 
-  ## looks at data as a sequence of values and returns a boolean that
-  ## tells whether we are between the two threshold values.
+  ## returns a logical status vector.  at each position the status is
+  ## TRUE if data exceeds the `threshold.true`, FALSE if falls below
+  ## the `threshold.false`.  if the data lays between the thresholds,
+  ## the last status is taken forward.  `threshold.true` must be
+  ## higher than `threshold.false`.
 
   s <- rep(NA, length(data))
   s[1] <- initial.status
   s[data > threshold.true] <- TRUE
   s[data < threshold.false] <- FALSE
+  if(on.equality==TRUE) {
+    s[data == threshold.true] <- TRUE
+    s[data == threshold.false] <- FALSE
+  }
   L <- !is.na(s)
   s[L][cumsum(L)]
 }

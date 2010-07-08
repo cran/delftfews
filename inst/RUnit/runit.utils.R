@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.utils.R 28 2010-08-11 12:15:43Z mariotomo $
+## $Id: runit.utils.R 32 2010-08-12 13:15:21Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -335,6 +335,28 @@ test.double.threshold.3 <- function() {
   values <- c(0, 2, 3, 2, 1, 0)
   target <- c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE)
   current <- double.threshold(values, 1, 2, TRUE)
+  checkEquals(target, current)
+}
+
+test.double.threshold.with.equal <- function() {
+  ## start below false threshold, ignores initial value TRUE
+  values <- c(0, 2, 3, 2, 1, 0)
+  current <- double.threshold(values, 1, 2, on.equality=TRUE)
+  target <- c(FALSE, TRUE, TRUE, TRUE, FALSE, FALSE)
+  checkEquals(target, current)
+}
+
+test.double.threshold.summarise.1 <- function() {
+  values <- c(0, 0.5, 0.75, 1, 1.25, 1.5, 1.65, 1.45, 1.25, 1.4, 1.6, 1.2, 1.1, 0.9, 1.2, 1, 1.3, 1.5, 1.6, 1.3, 1.1, 0.8, 1, 1.4, 1.5, 1.3, 1.2, 1.1, 0.5, 0.2, 0)
+  target <- c(0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+  current <- as.numeric(double.threshold(values, 1.1, 1.5))
+  checkEquals(target, current)
+}
+
+test.double.threshold.summarise.2 <- function() {
+  values <- c(0, 0.5, 0.75, 1, 1.25, 1.5, 1.65, 1.45, 1.25, 1.4, 1.6, 1.2, 1.1, 0.9, 1.2, 1, 1.3, 1.5, 1.6, 1.3, 1.1, 0.8, 1, 1.4, 1.5, 1.3, 1.2, 1.1, 0.5, 0.2, 0)
+  target <- c(0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0)
+  current <- as.numeric(double.threshold(values, 1.1, 1.5, on.equality=TRUE))
   checkEquals(target, current)
 }
 
