@@ -1,4 +1,4 @@
-# $Id: Makefile 21 2010-08-09 09:23:48Z mariotomo $
+# $Id: Makefile 29 2010-08-11 13:24:18Z mariotomo $
 
 TOP=../..
 PKG=${shell cd ${TOP};pwd}
@@ -8,7 +8,7 @@ R=R
 all: inst xtest
 
 xtest: inst test ## produces an output that can be used in emacs compilation buffer
-	egrep "(FAILURE|ERROR) in [^:]*" ${TOP}/tests/.output -o | cut -d\  -f 3- | xargs -I {} -n 1 grep -n "\<{}\>" *.R
+	egrep "(FAILURE|ERROR) in [^:]*" ${TOP}/tests/.output -o | cut -d\  -f 3- | xargs -I {} -n 1 grep -nF "\<{}\>" *.R
 
 inst: # Install package
 	cd ${TOP}/..;\

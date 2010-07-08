@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: augment.R 19 2010-08-06 15:06:01Z mariotomo $
+## $Id: augment.R 28 2010-08-11 12:15:43Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -54,8 +54,12 @@ timeseries <- function(from=NULL, to=NULL, by=NULL, length.out=NULL, order.by=NU
   params <- list(...)
   if(length(params) == 1) {
     input <- params[[1]]
-    if(is.matrix(input) || is.data.frame(input))
-      names(result) <- colnames(input)
+    if(is.matrix(input) || is.data.frame(input)){
+      if(dim(input)[2] == 1)
+        names(result) <- names(params)
+      else
+        names(result) <- colnames(input)
+    }
   }
 
   return(result)

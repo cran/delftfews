@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: rezoo.R 27 2010-08-10 10:15:48Z mariotomo $
+## $Id: rezoo.R 28 2010-08-11 12:15:43Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -120,9 +120,10 @@
   if(NCOL(object) > 0 & is.null(colnames(object))) stop("only possible for zoo series with column names")
   wi <- match(x, colnames(object))
   if(is.na(wi)) {
+    colnames.object <- colnames(object)
     object <- cbind(object, value)
     if(is.null(dim(object))) dim(object) <- c(length(object), 1)
-    colnames(object)[NCOL(object)] <- x  
+    colnames(object) <- c(colnames.object, x)
   } else {
     if(is.null(value)) {
       object <- object[, -wi, drop = FALSE]

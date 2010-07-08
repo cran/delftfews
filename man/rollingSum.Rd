@@ -1,17 +1,18 @@
 % File src/R/man/rollingSum.Rd
-% $Id: rollingSum.Rd 19 2010-08-06 15:06:01Z mariotomo $
+% $Id: rollingSum.Rd 30 2010-08-11 13:51:42Z mariotomo $
 
 \name{rollingSum}
 \alias{rollingSum}
 \alias{rollapply.default}
+\alias{rollapply.delftfews}
 \title{apply aggregating functions to contiguous stretches of data}
 \description{  
 
   `rollingSum` is a commodity function invoking `zoo::rollapply` with
   `FUN=sum`.
 
-  `zoo::rollapply` does not define a default method.  we do so in
-  delftfews.
+  `zoo::rollapply` does not define a default method.  we do so in the
+  package delftfews.
 
 }
 \usage{

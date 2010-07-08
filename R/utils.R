@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: utils.R 19 2010-08-06 15:06:01Z mariotomo $
+## $Id: utils.R 28 2010-08-11 12:15:43Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -98,6 +98,15 @@ stretches <- function(input, gap=1, what="start", zero.surrounded=FALSE) {
     result <- result - gap
   if(zero.surrounded)
     result <- result - gap
+  return(result)
+}
+
+rollapply.delftfews <- function(data, ...) {
+  class.data <- class(data)
+  index.data <- index(data)
+  result <- NextMethod(na.pad=TRUE, align='right')
+  class(result) <- class.data
+  index(result) <- index.data
   return(result)
 }
 

@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.augment.R 19 2010-08-06 15:06:01Z mariotomo $
+## $Id: runit.augment.R 29 2010-08-11 13:24:18Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -21,7 +21,7 @@ require(RUnit)
 
 EPOCH <- delftfews:::EPOCH
 
-test.timeseries <- function() {
+test.timeseries.base <- function() {
   ## test equality except dimnames
   minutes <- (0:5) * 720
   target <- zoo(data.frame(), as.POSIXct(minutes * 60, origin=EPOCH))
