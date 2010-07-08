@@ -1,4 +1,4 @@
-% $Id: as.seconds.Rd 3 2010-07-07 13:42:11Z mariotomo $
+% $Id: as.seconds.Rd 126 2011-09-21 14:05:59Z mariotomo $
 
 \name{as.seconds}
 \alias{as.seconds}
@@ -17,4 +17,8 @@ as.seconds(value)
 }
 \arguments{
   \item{value}{the object that is to be converted into seconds.}
+}
+\examples{
+EPOCH <- structure(0, class = c("POSIXct", "POSIXt"), tzone = "UTC")
+as.seconds(EPOCH)  # gives 0
 }

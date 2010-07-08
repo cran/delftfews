@@ -1,10 +1,9 @@
-% $Id: get.step.Rd 61 2011-03-11 14:28:14Z mariotomo $
+% $Id: get.step.Rd 127 2011-09-22 07:02:43Z mariotomo $
 
 \name{get.step}
 \alias{get.step}
 \alias{get.step.default}
 \alias{get.step.zoo}
-\alias{get.step.delftfews}
 \title{returns the timestep in the object}
 \description{
   the \code{get.step} functions take an object and depending on its
@@ -17,4 +16,8 @@ get.step(L, require.constant)
   \item{L}{the object from which to extract the timestep.}
   \item{require.constant}{if the inferred timestep is not constant,
     return NA.}
+}
+\examples{
+pidata <- timeseries(from=1234567890, to=1234587890, length.out=21)
+get.step(pidata)
 }

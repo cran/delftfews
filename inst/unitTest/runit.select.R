@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.select.R 41 2010-09-30 10:30:20Z mariotomo $
+## $Id: runit.select.R 135 2011-09-23 08:57:52Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -22,11 +22,31 @@ require(svUnit)
 EPOCH <- delftfews:::EPOCH
 
 test.timestamp.in.range <- function() {
-  DEACTIVATED("timestamp.in.range is not tested.")
+  pidata <- timeseries(as.POSIXct(1263553200, origin=EPOCH), by=15*60, length.out=289, H.gewogen=-1.5)
+  target <- c(55L, 151L, 247L)
+  current <- which(timestamp.in.range(pidata, from=1263601800, to=1263601801, by=86400, offset=0, units='secs'))
+  checkEquals(target, current)
+  target <- c(7L, 55L, 103L, 151L, 199L, 247L)
+  current <- which(timestamp.in.range(pidata, from=1263601800, to=1263601801, by=86400/2, offset=0, units='secs'))
+  checkEquals(target, current)
 }
 
-test.timestamp.in.range.weekday <- function() {
-  DEACTIVATED("timestamp.in.range.weekday is not tested.")
+test.timestamp.in.range.weekday.workday <- function() {
+  pidata <- timeseries(as.POSIXct(1263553200, origin=EPOCH), by=15*60, length.out=289, H.gewogen=-1.5)
+
+  in.workweek <- timestamp.in.range.weekday(pidata, tz="UTC", from=1, to=6)
+  target <- rep(TRUE, 289)
+  target[53:244] <- FALSE
+  checkEquals(target, in.workweek)
+}
+
+test.timestamp.in.range.weekday.saturday <- function() {
+  pidata <- timeseries(as.POSIXct(1263553200, origin=EPOCH), by=15*60, length.out=289, H.gewogen=-1.5)
+
+  on.saturday <- timestamp.in.range.weekday(pidata, tz="UTC", from=6, to=7)
+  target <- rep(FALSE, 289)
+  target[53:148] <- TRUE
+  checkEquals(target, on.saturday)
 }
 
 test.timestamp.in.weekend <- function() {
@@ -105,7 +125,10 @@ test.timestamp.in.range.hour.b <- function() {
 }
 
 test.reformat.date <- function() {
-  DEACTIVATED("reformat.date is not tested.")
+  ## testing internal function .reformat.date
+  checkEquals("0101", delftfews:::.reformat.date("0101"))
+  checkEquals("0101", delftfews:::.reformat.date("01/01"))
+  checkEquals("0101", delftfews:::.reformat.date("01-01"))
 }
 
 test.timestamp.in.range.calendar.contiguous.1.a <- function() {
@@ -195,7 +218,7 @@ test.select.percentiles.timeseries.30.80.10 <- function() {
   colnames(l) <- rep('a', 10)
   pidata <- timeseries(21000000*60, by=5*60, length.out=22, data=l)
   current <- select.percentiles(pidata, c(30, 80))
-  target <- timeseries(21000000*60, by=5*60, length.out=22, a.30=3, a.80=8)
+  target <- timeseries(21000000*60, by=5*60, length.out=22, a.30=3L, a.80=8L)
   checkEquals(target, current)
 }
 
@@ -206,7 +229,7 @@ test.select.percentiles.timeseries.10.20.90.100.10 <- function() {
   colnames(l) <- rep('a', 10)
   pidata <- timeseries(21000000*60, by=5*60, length.out=22, data=l)
   current <- select.percentiles(pidata, c(10, 20, 90, 100))
-  target <- timeseries(21000000*60, by=5*60, length.out=22, a.10=1, a.20=2, a.90=9, a.100=10)
+  target <- timeseries(21000000*60, by=5*60, length.out=22, a.10=1L, a.20=2L, a.90=9L, a.100=10L)
   checkEquals(target, current)
 }
 
@@ -217,7 +240,7 @@ test.select.percentiles.timeseries.30.80.100 <- function() {
   colnames(l) <- rep('a', 100)
   pidata <- timeseries(21000000*60, by=5*60, length.out=22, data=l)
   current <- select.percentiles(pidata, c(30, 80))
-  target <- timeseries(21000000*60, by=5*60, length.out=22, a.30=30, a.80=80)
+  target <- timeseries(21000000*60, by=5*60, length.out=22, a.30=30L, a.80=80L)
   checkEquals(target, current)
 }
 
@@ -233,7 +256,7 @@ test.select.percentiles.timeseries.with.four.NA.columns <- function() {
   colnames(l) <- rep('a', 104)
   pidata <- timeseries(21000000*60, by=5*60, length.out=22, data=l)
   current <- select.percentiles(pidata, c(30, 80))
-  target <- timeseries(21000000*60, by=5*60, length.out=22, a.30=30, a.80=80)
+  target <- timeseries(21000000*60, by=5*60, length.out=22, a.30=30L, a.80=80L)
   checkEquals(target, current)
 }
 
@@ -247,94 +270,4 @@ test.select.percentiles.timeseries.with.only.NA.columns <- function() {
   current <- select.percentiles(pidata, c(30, 80))
   target <- timeseries(21000000*60, by=5*60, length.out=22, a.30=NA, a.80=NA)
   checkEquals(target, current)
-}
-
-## selecting complete rows and columns.
-
-test.getitem.delftfews.character <- function() {
-  ## overridden: selects by COLUMN
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  checkEquals(FWS[,'a', drop=FALSE], FWS['a'])
-  checkEquals(FWS[,'b', drop=FALSE], FWS['b'])
-  checkEquals(FWS[,c('a', 'b'), drop=FALSE], FWS[c('a', 'b')])
-}
-
-'test.[.delftfews.numeric' <- function() {
-  ## must decide what to do here.  as of now, selects by ROW!
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  checkEquals(FWS[2], FWS[2.0])
-  checkEquals(FWS[2], FWS[2L])
-}
-
-'test.[.delftfews.timestamp' <- function() {
-  ## choosing by timestamp selects by ROW!
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  checkEquals(FWS[1, 1:2], FWS[as.POSIXct(1234567800, origin=EPOCH)])
-  checkEquals(FWS[2, 1:2], FWS[as.POSIXct(1234567800 + 57600*60, origin=EPOCH)])
-}
-
-'test.[<-.delftfews.character' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  FWS['a'] <- 5:8
-  checkEqualsNumeric(5:8, FWS['a'])
-}
-
-'test.[<-.delftfews.character.new.column' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  FWS['d'] <- 5:8
-  checkEqualsNumeric(5:8, FWS[, 'd'])
-}
-
-'test.[<-.delftfews.character.adding.named.column' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  FWS['d'] <- FWS$a
-  checkEqualsNumeric(rep(1, 4), FWS[, 'd'])
-}
-
-'test.$<-.delftfews.redefining' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  FWS$a <- 4:7
-  checkEqualsNumeric(4:7, FWS[, 'a'])
-}
-
-'test.$.delftfews.non.existing' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  checkTrue(is.null(FWS$c))
-}
-
-'test.$<-.delftfews.keeps.other.names' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  colnames(FWS) <- c('ab-c','d,e,f')
-  FWS$a <- 4:7
-  checkEquals(c('ab-c','d,e,f', 'a'), colnames(FWS))
-}
-
-'test.[.delftfews.non.existing' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  checkTrue(is.null(FWS['c']))
-}
-
-'test.[<-.delftfews.keeps.other.names' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  colnames(FWS) <- c('ab-c','d,e,f')
-  FWS['a'] <- 4:7
-  checkEquals(c('ab-c','d,e,f', 'a'), colnames(FWS))
-}
-
-'test.$<-.delftfews.adding.to.existing' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  FWS$d <- 4:7
-  checkEqualsNumeric(4:7, FWS[, 'd'])
-}
-
-'test.$<-.delftfews.adding.to.empty' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4)
-  FWS$d <- 4:7
-  checkEqualsNumeric(4:7, FWS[, 'd'])
-}
-
-'test.$<-.delftfews.character.adding.named.column' <- function() {
-  FWS <- timeseries(as.POSIXct(1234567800, origin=EPOCH), by=57600*60, length.out=4, l=cbind(a=1, b=3))
-  FWS$d <- FWS$a
-  checkEqualsNumeric(rep(1, 4), FWS[, 'd'])
 }

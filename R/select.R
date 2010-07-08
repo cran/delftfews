@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: select.R 66 2011-03-14 13:48:29Z mariotomo $
+## $Id: select.R 91 2011-08-09 13:17:37Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -70,10 +70,9 @@ timestamp.in.range.hour <- function(data, from, to, tz="CET") {
   timestamp.in.range(data, from, to, 24, 'hours', 0, tz=tz)
 }
 
-
-reformat.date <- function(datestring) {
+.reformat.date <- function(datestring) {
   ## transforms date with some separator to MMDD
-  ##
+  ## not exported, needed by timestamp.in.range.calendar.
 
   parts <- strsplit(datestring, '[/-]')[[1]]
   if(length(parts) == 1) {
@@ -84,14 +83,13 @@ reformat.date <- function(datestring) {
   return(paste(sprintf("%02d", as.numeric(parts)), collapse=''))
 }
 
-
 timestamp.in.range.calendar <- function(data, from, to, tz="CET") {
   ## returns whether the timestamps of a timeseries are between start and end date
 
   dates <- format.Date(index(data), format="%m%d")
 
-  from <- reformat.date(from)
-  to <- reformat.date(to)
+  from <- .reformat.date(from)
+  to <- .reformat.date(to)
 
   if(from < to)
     result <- (dates >= from) & (dates < to)
@@ -139,46 +137,5 @@ select.percentiles <- function(input, percentiles, score.function=sum.first, ...
   colnames(result) <- paste(names(input)[columns], percentiles, sep='.')
 
   ## done
-  return(result)
-}
-
-"[.delftfews" <- function(x, i, j, drop = FALSE, ...) {
-  class.x <- class(x)
-  try({
-    result <- (if (missing(i))
-               NextMethod(drop=drop)
-    else if (missing(j) && is.character(i))
-               NextMethod(i=seq_len(NROW(x)), drop=drop)
-    else
-               NextMethod(drop=drop))
-    class(result) <- class.x
-    return(result)
-  }, silent=TRUE)
-  return(NULL)
-}
-
-"[<-.delftfews" <- function(x, i, j, value) {
-  class.x <- class(x)
-  result <- (if (missing(i))
-             NextMethod()
-  else if (missing(j) && is.character(i))
-             do.call("$<-.zoo", list(object=x, x=i, value=value))
-  else
-             NextMethod())
-  class(result) <- class.x
-  return(result)
-}
-
-'$.delftfews' <- function(object, ...) {
-  class.object <- class(object)
-  result <- NextMethod()
-  if(!is.null(result)) class(result) <- class.object
-  return(result)
-}
-
-'$<-.delftfews' <- function(object, ..., value) {
-  class.object <- class(object)
-  result <- NextMethod()
-  class(result) <- class.object
   return(result)
 }

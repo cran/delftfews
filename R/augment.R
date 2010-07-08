@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: augment.R 67 2011-03-14 14:20:45Z mariotomo $
+## $Id: augment.R 99 2011-08-11 09:30:41Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -49,8 +49,6 @@ timeseries <- function(from=NULL, to=NULL, by=NULL, length.out=NULL, order.by=NU
   result <- zoo(data.frame(...), order.by=timestamps, frequency=1.0/by)
   ## we make no use of rowname information, they only confuse our tests.
   rownames(result) <- NULL
-  ## following trick allows us override specific methods
-  class(result) <- c("delftfews", class(result))
 
   params <- list(...)
   if(length(params) == 1) {
@@ -66,43 +64,45 @@ timeseries <- function(from=NULL, to=NULL, by=NULL, length.out=NULL, order.by=NU
   return(result)
 }
 
-cumulate.timeseries <- function(input, column="input", gap=1, integration.method=3, units="secs") {
-  ## given a timeseries set with an '"input"' column, augment it with
-  ## four columns holding netto and gross cumulative summarization of
-  ## input.  the 'integration.method' refers to the overview presented
-  ## in http://portal.acm.org/citation.cfm?id=578374, figure 7.2.  1:
+cumulate <- function(input, gap=1, integration.method=3, with.partials=FALSE, ...)
+  UseMethod('cumulate')
+
+cumulate.default <- function(input, ...) NULL
+
+cumulate.zoo <- function(input, gap=1, integration.method=3, with.partials=FALSE, units="secs", skip.first=FALSE, ...) {
+  ## given an univariate series, indexed on POSIXct time stamps,
+  ## return a series set containing four columns, the netto and gross
+  ## cumulative summarization of input.  the 'integration.method'
+  ## refers to the overview presented in
+  ## http://portal.acm.org/citation.cfm?id=578374, figure 7.2.  1:
   ## rectangular (top left), 2: rectangular (midpoint), 3: trapezoid,
   ## 4: simpson's.  the methods are implemented taking into account
   ## the two 0 measurements outside the stretch under examination.
 
-  result <- data.frame(row.names=seq_len(NROW(input)))
-  result[[paste(column, 'gross', 'partials', sep='.')]] <- NA
-  result[[paste(column, 'gross', 'totals', sep='.')]] <- NA
-  result[[paste(column, 'gross', 'duration', sep='.')]] <- NA
-
-  result[[paste(column, 'net', 'partials', sep='.')]] <- NA
-  result[[paste(column, 'net', 'totals', sep='.')]] <- NA
-  result[[paste(column, 'net', 'duration', sep='.')]] <- NA
+  keys <- index(input)
+  result <- zoo(cbind(gross=NA, gross.duration=NA,
+                      net=NA, net.duration=NA), order.by=keys)
+  if(with.partials)
+    result <- cbind(result, partials=NA)
 
   augment <- function(start, end, type) {
-    start.ts <- index(input)[start]
-    if(end >= nrow(input)) {
-      end.ts <- index(input)[end] + (index(input)[end] - index(input)[end - 1])
-      timestamps <- index(input)[start:end]
-      timestamps <- c(timestamps, end.ts)
+    start.ts <- keys[start]
+    if(end == length(input)) {
+      end.ts <- keys[end] + (keys[end] - keys[end - 1])
+      timestamps <- c(keys[start:end], end.ts)
     } else {
-      end.ts <- index(input)[end+1]
-      timestamps <- index(input)[start:(end+1)]
+      end.ts <- keys[end+1]
+      timestamps <- keys[start:(end+1)]
     }
 
     ## prepare local data that is used more than once
     intervals <- as.double(diff(timestamps), units=units)
     if (integration.method == 1) {
       ## rectangular, top left
-      values <- input[start:end, column]
+      values <- input[start:end]
     } else if (integration.method == 3) {
       ## trapezoid
-      values <- rollapply(c(0, input[start:end, column], 0), 2, mean, na.action=na.zero)[-1]
+      values <- rollapply(c(0, na.zero(input[start:end]), 0), 2, mean)
       intervals[length(intervals) + 1] <- intervals[length(intervals)]
       end <- end + 1
     } else {
@@ -111,19 +111,23 @@ cumulate.timeseries <- function(input, column="input", gap=1, integration.method
     partials <- values * intervals
     
     ## '<<-' modifies surrounding environment
-    result[[paste(column, type, 'partials', sep=".")]][start:end] <<- partials
-    result[[paste(column, type, 'totals', sep=".")]][start] <<- sum(partials, na.rm=TRUE)
-    result[[paste(column, type, 'duration', sep=".")]][start] <<- as.double(end.ts - start.ts, units='secs')
+    result[keys[start], type] <<- sum(partials, na.rm=TRUE)
+    result[keys[start], paste(type, 'duration', sep=".")] <<- as.double(end.ts - start.ts, units=units)
+    if(with.partials)
+      result[keys[start:end], 'partials'] <<- partials
+    return(invisible())
   }
 
   mapply(augment,
-         stretches(input[, column], what="start", zero.surrounded=TRUE),
-         stretches(input[, column], what="end", zero.surrounded=TRUE),
+         stretches(input, what="start", zero.surrounded=TRUE),
+         stretches(input, what="end", zero.surrounded=TRUE),
          MoreArgs=list(type="net"))
   mapply(augment,
-         stretches(input[, column], gap, what="start", zero.surrounded=TRUE),
-         stretches(input[, column], gap, what="end", zero.surrounded=TRUE),
+         stretches(input, gap, what="start", zero.surrounded=TRUE),
+         stretches(input, gap, what="end", zero.surrounded=TRUE),
          MoreArgs=list(type="gross"))
 
-  cbind(input, zoo(result, index(input)))
+  if(skip.first == TRUE)
+    result[keys[1], ] <- NA
+  return(result)
 }

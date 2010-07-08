@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: diagnostics.R 60 2011-02-02 12:41:26Z mariotomo $
+## $Id: diagnostics.R 84 2011-08-05 12:45:50Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -49,7 +49,7 @@ formatter.fewsdiagnostics <- function(record) {
 setup.fewsdiagnostics <- function(filename) {
   cat('<?xml version="1.0" encoding="UTF-8" standalone="yes"?> \n<Diag version="1.2" xmlns="http://www.wldelft.nl/fews/PI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.wldelft.nl/fews/PI HTTP://fews.wldelft.nl/schemas/version1.0/pi-schemas/pi_diag.xsd">\n', file=filename, append=FALSE)
   addHandler('diagnostics',
-             writeToFile, file=filename,
+             action=writeToFile, file=filename,
              logger='fews.diagnostics',
              formatter=formatter.fewsdiagnostics)
 }

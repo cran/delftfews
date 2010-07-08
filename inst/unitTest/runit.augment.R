@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.augment.R 67 2011-03-14 14:20:45Z mariotomo $
+## $Id: runit.augment.R 108 2011-08-12 12:40:32Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -22,38 +22,37 @@ require(svUnit)
 EPOCH <- delftfews:::EPOCH
 
 test.timeseries.base <- function() {
-  ## test equality except dimnames
-  minutes <- (0:5) * 720
-  target <- zoo(data.frame(), as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
-  class(target) <- c("delftfews", class(target))
+  ## test equality between zoo and timeseries contructors
   current <- timeseries(from=0, by=720*60, length.out=6)
-  checkEqualsNumeric(target, current)
+  target <- zoo(order.by=structure((0:5) * 43200, class=c("POSIXct", "POSIXt"), tzone="UTC"), frequency=1/43200)
+  checkEquals(target, current)
 }
 
-test.timeseries.dimnames <- function() {
-  ## only test dimnames
-  minutes <- (0:5) * 720
-  target <- list(NULL, NULL)
-  current <- dimnames(timeseries(from=0, by=720*60, length.out=6))
-  checkEquals(target, current)
+test.timeseries.shape.of.empty <- function() {
+  ## now test properties of new empty object
+  current <- timeseries(from=0, by=720*60, length.out=6)
+  checkTrue(is.null(dim(current)))
+  checkTrue(is.null(colnames(current)))
+  checkTrue(is.null(rownames(current)))
+  checkEquals(EPOCH + (0:5) * 43200, index(current))
 }
 
 test.timeseries.with.one.column <- function() {
   minutes <- (0:5) * 720
   target <- zoo(data.frame(a=1), as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
   dimnames(target) <- list(NULL, dimnames(target)[[2]])
-  class(target) <- c("delftfews", class(target))
   current <- timeseries(from=0, by=720*60, length.out=6, a=1)
   checkEquals(target, current)
+  checkEquals(c(6L, 1L), dim(current))
 }
 
 test.timeseries.with.more.columns <- function() {
   minutes <- (0:5) * 720
   target <- zoo(data.frame(a=1, b=1:6), as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
   dimnames(target) <- list(NULL, dimnames(target)[[2]])
-  class(target) <- c("delftfews", class(target))
   current <- timeseries(from=0, by=720*60, length.out=6, a=1, b=1:6)
   checkEquals(target, current)
+  checkEquals(c(6L, 2L), dim(current))
 }
 
 test.timeseries.with.data.frame <- function() {
@@ -61,7 +60,6 @@ test.timeseries.with.data.frame <- function() {
   minutes <- (0:5) * 720
   target <- zoo(full, as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
   dimnames(target) <- list(NULL, dimnames(target)[[2]])
-  class(target) <- c("delftfews", class(target))
   current <- timeseries(from=0, by=720*60, length.out=6, data=full)
   checkEquals(target, current)
 }
@@ -72,44 +70,64 @@ test.timeseries.with.order.by <- function() {
   template <- timeseries(from=0, by=720*60, length.out=6)
   target <- zoo(full, as.POSIXct(minutes * 60, origin=EPOCH), 1/720/60)
   dimnames(target) <- list(NULL, dimnames(target)[[2]])
-  class(target) <- c("delftfews", class(target))
 
   current <- timeseries(order.by=index(template), data=full)
   checkEquals(target, current)
 }
 
-test.cumulate.timeseries.one.net.stretch <- function() {
+test.cumulate.zoo.one.net.stretch <- function() {
   data <- rep(NA, 10)
   data[4:6] <- 5
   ## 0 0 0 5 5 5 0 0 0 0
   pidata <- timeseries(1234567800, by=5*60, length.out=10, input=data)
 
-  result <- cumulate.timeseries(pidata, integration.method=1)
+  result <- cumulate(pidata[, 1], integration.method=1, with.partials=TRUE)
+  checkEquals(TRUE, is.zoo(result))
 
   target <- rep(NA, 10)
   target[4:6] <- 25*60
-  checkEquals(target, coredata(result$input.gross.partials))
-  checkEquals(target, coredata(result$input.net.partials))
+  checkEquals(target, as.vector(result$partials))
 
   target <- rep(NA, 10)
   target[4] <- 75*60
-  checkEquals(target, coredata(result$input.gross.totals))
-  checkEquals(target, coredata(result$input.net.totals))
+  checkEquals(target, as.vector(result$gross))
+  checkEquals(target, as.vector(result$net))
 
   target <- rep(NA, 10)
   target[4] <- 15 * 60
-  checkEquals(target, coredata(result$input.gross.duration))
-  checkEquals(target, coredata(result$input.net.duration))
+  checkEquals(target, as.vector(result$gross.duration))
+  checkEquals(target, as.vector(result$net.duration))
 }
 
-test.cumulate.timeseries.one.net.stretch.trapezoid <- function() {
+test.cumulate.zoo.one.net.stretch.no.partials <- function() {
+  data <- rep(NA, 10)
+  data[4:6] <- 5
+  ## 0 0 0 5 5 5 0 0 0 0
+  pidata <- timeseries(1234567800, by=5*60, length.out=10, input=data)
+
+  result <- cumulate(pidata[, 1], integration.method=1)
+
+  checkEquals(FALSE, 'partials' %in% colnames(result))
+
+  target <- rep(NA, 10)
+  target[4] <- 75*60
+  checkEquals(target, as.vector(result$gross))
+  checkEquals(target, as.vector(result$net))
+
+  target <- rep(NA, 10)
+  target[4] <- 15 * 60
+  checkEquals(target, as.vector(result$gross.duration))
+  checkEquals(target, as.vector(result$net.duration))
+}
+
+test.cumulate.zoo.one.net.stretch.trapezoid <- function() {
   data <- rep(NA, 10)
   data[4:6] <- 2
   data[5] <- 4
   ## 0 0 0 2 4 2 0 0 0 0
-  pidata <- timeseries(1234567800, by=5*60, length.out=10, input=data)
+  pidata <- zoo(cbind(input=data), order.by=EPOCH + seq(1234567800, by=5*60, length.out=10))
 
-  result <- cumulate.timeseries(pidata, integration.method=3)
+  result <- cumulate(pidata[, 1], integration.method=3, with.partials=TRUE)
   ## input duration partials totals
   ##     0       NA       NA     NA
   ##     0       NA       NA     NA
@@ -125,22 +143,21 @@ test.cumulate.timeseries.one.net.stretch.trapezoid <- function() {
   target <- rep(NA, 10)
   target[c(4,7)] <- 5 * 60
   target[c(5,6)] <- 15 * 60
-  checkEquals(target, coredata(result$input.gross.partials))
-  checkEquals(target, coredata(result$input.net.partials))
+  checkEquals(target, as.vector(result$partials))
 
   target <- rep(NA, 10)
   target[4] <- 40 * 60
-  checkEquals(target, coredata(result$input.gross.totals))
-  checkEquals(target, coredata(result$input.net.totals))
+  checkEquals(target, as.vector(result$gross))
+  checkEquals(target, as.vector(result$net))
 
   ## TODO - now same duration as integration.method 1
   target <- rep(NA, 10)
   target[4] <- 15 * 60
-  checkEquals(target, coredata(result$input.gross.duration))
-  checkEquals(target, coredata(result$input.net.duration))
+  checkEquals(target, as.vector(result$gross.duration))
+  checkEquals(target, as.vector(result$net.duration))
 }
 
-test.cumulate.timeseries.two.net.stretches <- function() {
+test.cumulate.zoo.two.net.stretches <- function() {
   data <- rep(NA, 15)
   data[4:6] <- 5
   data[9] <- 5
@@ -162,9 +179,9 @@ test.cumulate.timeseries.two.net.stretches <- function() {
   ## 14 2009-02-14 00:35:00     0
   ## 15 2009-02-14 00:40:00     0
 
-  result <- cumulate.timeseries(pidata, gap=3, integration.method=1)
+  result <- cumulate(pidata[, 1], gap=3, integration.method=1)
 
-  ##    input input.gross.totals input.net.totals
+  ##    input gross.totals net.totals
   ## 1      0                  0                0
   ## 2      0                  0                0
   ## 3      0                  0                0
@@ -182,12 +199,12 @@ test.cumulate.timeseries.two.net.stretches <- function() {
   ## 15     0                  0                0
   target <- rep(NA, 15)
   target[4] <- 100 * 60
-  checkEquals(target, coredata(result$input.gross.totals))
+  checkEquals(target, as.vector(result$gross))
   target[4] <- 75 * 60
   target[9] <- 25 * 60
-  checkEquals(target, coredata(result$input.net.totals))
+  checkEquals(target, as.vector(result$net))
 
-  ##    input input.gross.duration input.net.duration 
+  ##    input gross.duration net.duration 
   ## 1      0                    0                  0 
   ## 2      0                    0                  0 
   ## 3      0                    0                  0 
@@ -205,13 +222,13 @@ test.cumulate.timeseries.two.net.stretches <- function() {
   ## 15     0                    0                  0 
   target <- rep(NA, 15)
   target[4] <- 30 * 60
-  checkEquals(target, coredata(result$input.gross.duration))
+  checkEquals(target, as.vector(result$gross.duration))
   target[4] <- 15 * 60
   target[9] <- 5 * 60
-  checkEquals(target, coredata(result$input.net.duration))
+  checkEquals(target, as.vector(result$net.duration))
 }
 
-test.cumulate.timeseries.two.net.stretches.trapezoid <- function() {
+test.cumulate.zoo.two.net.stretches.trapezoid <- function() {
   data <- rep(NA, 15)
   data[4:6] <- 5
   data[9] <- 5
@@ -233,7 +250,7 @@ test.cumulate.timeseries.two.net.stretches.trapezoid <- function() {
   ## 14 2009-02-14 00:35:00     0
   ## 15 2009-02-14 00:40:00     0
 
-  result <- cumulate.timeseries(pidata, gap=3, integration.method=3)
+  result <- cumulate(pidata[, 1], gap=3, integration.method=3, with.partials=TRUE)
 
   ##    input gross.partials net.partials
   ## 1      0             NA           NA
@@ -254,13 +271,11 @@ test.cumulate.timeseries.two.net.stretches.trapezoid <- function() {
   target <- rep(NA, 15)
   target[4:10] <- 12.5 * 60
   target[5:6] <- 25 * 60
-  target[8] <- NA
-  checkEquals(target, coredata(result$input.net.partials))
   target[8] <- 0
-  checkEquals(target, coredata(result$input.gross.partials))
+  checkEquals(target, as.vector(result$partials))
 }
 
-test.cumulate.timeseries.two.net.stretches.near.borders <- function() {
+test.cumulate.zoo.two.net.stretches.near.borders <- function() {
   data <- rep(NA, 10)
   data[2:6] <- 5
   data[9:10] <- 5
@@ -277,9 +292,9 @@ test.cumulate.timeseries.two.net.stretches.near.borders <- function() {
   ## 9  2009-02-14 00:10:00     5
   ## 10 2009-02-14 00:15:00     5
 
-  result <- cumulate.timeseries(pidata, gap=3, integration.method=1)
+  result <- cumulate(pidata[, 1], gap=3, integration.method=1)
 
-  ##    input input.gross.totals input.net.totals
+  ##    input gross.totals net.totals
   ## 1      0                  0                0
   ## 2      5                175|             125|
   ## 3      5                  0|               0|
@@ -292,12 +307,12 @@ test.cumulate.timeseries.two.net.stretches.near.borders <- function() {
   ## 10     5                  0|               0|
   target <- rep(NA, 10)
   target[2] <- 175 * 60
-  checkEquals(target, coredata(result$input.gross.totals))
+  checkEquals(target, as.vector(result$gross))
   target[2] <- 125 * 60
   target[9] <- 50 * 60
-  checkEquals(target, coredata(result$input.net.totals))
+  checkEquals(target, as.vector(result$net))
 
-  ##    input input.gross.duration input.net.duration 
+  ##    input gross.duration net.duration 
   ## 1      0                    0                  0 
   ## 2      5                   45|                25|
   ## 3      5                    0|                 0|
@@ -310,42 +325,87 @@ test.cumulate.timeseries.two.net.stretches.near.borders <- function() {
   ## 10     5                    0|                 0|
   target <- rep(NA, 10)
   target[2] <- 45 * 60
-  checkEquals(target, coredata(result$input.gross.duration))
+  checkEquals(target, as.vector(result$gross.duration))
   target[2] <- 25 * 60
   target[9] <- 10 * 60
-  checkEquals(target, coredata(result$input.net.duration))
+  checkEquals(target, as.vector(result$net.duration))
 }
 
-test.cumulate.timeseries.all.NA <- function() {
+test.cumulate.zoo.all.NA <- function() {
   pidata <- timeseries(21000000*60, by=5*60, length.out=10)
-  pidata$input <- NA
+  pidata <- cbind(pidata, input=NA)
 
-  result <- cumulate.timeseries(pidata, integration.method=1)
+  result <- cumulate(pidata[, 1], integration.method=1)
 
   target <- rep(NA, 10)
-  checkEquals(target, coredata(result$input.gross.totals))
-  checkEquals(target, coredata(result$input.net.totals))
-  checkEquals(target, coredata(result$input.gross.duration))
-  checkEquals(target, coredata(result$input.net.duration))
+  checkEquals(target, as.vector(result$gross))
+  checkEquals(target, as.vector(result$net))
+  checkEquals(target, as.vector(result$gross.duration))
+  checkEquals(target, as.vector(result$net.duration))
 }
 
-test.add.column.to.empty <- function() {
+test.cumulate.zoo.skip.event.at.start <- function() {
+  pidata <- zoo(cbind(a=c(6:1,5:2)), order.by=structure((0:9)*3600, class=c("POSIXct", "POSIXt")))
+
+  result <- cumulate(pidata[, 1], integration.method=1, skip.first=TRUE)
+
+  target <- as.numeric(rep(NA, 10))
+  checkEquals(target, as.vector(result$gross))
+  checkEquals(target, as.vector(result$net))
+  checkEquals(target, as.vector(result$gross.duration))
+  checkEquals(target, as.vector(result$net.duration))
+}
+
+test.cumulate.zoo.include.event.at.start <- function() {
+  pidata <- zoo(cbind(a=c(6:1,5:2)), order.by=structure((0:9)*3600, class=c("POSIXct", "POSIXt")))
+
+  result <- cumulate(pidata[, 1], integration.method=1, skip.first=FALSE)
+
+  target <- as.numeric(rep(NA, 9))
+  checkEquals(c(126000, target), as.vector(result$gross))
+  checkEquals(c(126000, target), as.vector(result$net))
+  checkEquals(c(36000, target), as.vector(result$gross.duration))
+  checkEquals(c(36000, target), as.vector(result$net.duration))
+}
+
+test.add.column.to.empty.shortcut <- function() {
   pidata <- timeseries(to=21000000*60, by=10800, length.out=1)
   target <- c(12)
   pidata$z <- target
   checkEquals(target, as.vector(pidata$z))
 }
 
-test.add.column.to.single.column <- function() {
+test.add.column.to.empty.standard <- function() {
+  pidata <- timeseries(to=21000000*60, by=10800, length.out=1)
+  target <- c(12)
+  pidata <- cbind(pidata, z=target)
+  checkEquals(target, as.vector(pidata))
+}
+
+test.add.column.to.single.column.shortcut <- function() {
   pidata <- timeseries(to=21000000*60, by=10800, length.out=1, a=1)
   target <- c(20)
   pidata$z <- target
   checkEquals(target, as.vector(pidata$z))
 }
 
-test.add.column.to.multi.column <- function() {
+test.add.column.to.single.column.standard <- function() {
+  pidata <- timeseries(to=21000000*60, by=10800, length.out=1, a=1)
+  target <- c(20)
+  pidata <- cbind(pidata, z=target)
+  checkEquals(target, as.vector(pidata$z))
+}
+
+test.add.column.to.multi.column.shortcut <- function() {
   pidata <- timeseries(to=21000000*60, by=10800, length.out=1, a=1, b=2)
   target <- c(20)
   pidata$z <- target
+  checkEquals(target, as.vector(pidata$z))
+}
+
+test.add.column.to.multi.column.standard <- function() {
+  pidata <- timeseries(to=21000000*60, by=10800, length.out=1, a=1, b=2)
+  target <- c(20)
+  pidata <- cbind(pidata, z=target)
   checkEquals(target, as.vector(pidata$z))
 }

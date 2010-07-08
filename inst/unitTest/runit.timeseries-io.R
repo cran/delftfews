@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.timeseries-io.R 61 2011-03-11 14:28:14Z mariotomo $
+## $Id: runit.timeseries-io.R 131 2011-09-22 07:30:27Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -25,27 +25,20 @@ parseSplitDcf <- delftfews:::parseSplitDcf
 
 EPOCH <- delftfews:::EPOCH
 
-test.read.PI.just.reading <- function() {
-  pidata <- read.PI('data/decumulative.input.xml')
-  checkEquals("delftfews", class(pidata)[1])
+if(FALSE) {
+  ## interactive testing...
+  require(delftfews)
+  setwd("~/Local/r-forge.r-project.org/delftfews/pkg/tests/")
+  checkTrue <- function(x) all(x == TRUE)
+  checkEquals <- function(x, y) all(x == y)
+  checkEqualsNumeric <- function(x, y) all(as.numeric(x) == as.numeric(y))
+  checkException <- function(x, ...) x
 }
 
-## test.computing.decumulative <- function() {
-##   DEACTIVATED("this is not a unit test, it's a usage example.")
-##   pidata <- read.PI('data/decumulative.input.xml')
-
-##   current <- data.frame(timestamps=index(pidata)[-1]) # drop first timestamp
-##   current$P1201 <- diff(pidata[, 'lp.600-P1201.WNS954'])
-##   current$P1202 <- diff(pidata[, 'lp.600-P1202.WNS954'])
-##   current$P1203 <- diff(pidata[, 'lp.600-P1203.WNS954'])
-
-##   pidata.out <- read.PI('data/decumulative.output.xml')
-
-##   checkEquals(index(pidata.out), index(current))
-##   checkEquals(pidata.out[, 'lp.600-P1201.WNS954.omgezet'], current$P1201)
-##   checkEquals(pidata.out[, 'lp.600-P1202.WNS954.omgezet'], current$P1202)
-##   checkEquals(pidata.out[, 'lp.600-P1203.WNS954.omgezet'], current$P1203)
-## }
+test.read.PI.just.reading <- function() {
+  pidata <- read.PI('data/decumulative.input.xml')
+  checkTrue(is.zoo(pidata))
+}
 
 test.read.PI.na.pass.base <- function() {
   ## value is not at all present for timestamp.
@@ -74,19 +67,25 @@ test.read.PI.na.pass.flag9 <- function() {
 test.read.PI.one.empty.series <- function() {
   ## reader does not crash on one eventless series
 
-  read.PI('data/eventless-f0.xml')
+  pidata <- read.PI('data/eventless-f0.xml')
+  checkEquals(c(10, 2), dim(pidata))
+  checkEquals(c("lp.600-P1201.WNS925", "lp.600-P2504.WNS925"), colnames(pidata))
 }
 
 test.read.PI.first.empty.series <- function() {
   ## reader does not crash on first series being eventless
 
-  read.PI('data/eventless-0f.xml')
+  pidata <- read.PI('data/eventless-0f.xml')
+  checkEquals(c(10, 2), dim(pidata))
+  checkEquals(c("lp.600P2504.WNS925", "lp.600P1201.WNS925"), colnames(pidata))
 }
 
 test.read.PI.all.empty.series <- function() {
   ## reader returns something even if no events are found at all
 
-  read.PI('data/eventless-0.xml', step.seconds=1440*60)
+  pidata <- read.PI('data/eventless-0.xml', step.seconds=1440*60)
+  checkEquals(c(31, 1), dim(pidata))
+  checkTrue(all(is.na(pidata)))
 
   checkException(read.PI('data/eventless-0.xml'), ", crashes if you do not specify step.seconds")
 }
@@ -97,6 +96,199 @@ test.read.PI.timezone.2 <- function() {
 
   target <- EPOCH + seq(from=1270245600, to=1271023200, by=86400)
   checkEqualsNumeric(target, index(pidata))
+}
+
+test.read.PI.is.irregular.TRUE <- function() {
+  pidata <- read.PI('data/peilschalen-3.xml', is.irregular=TRUE)
+
+  target <- structure(c(1282644388, 1282645827, 1282719141,
+                        1284544972, 1284556921, 1287647956,
+                        1287654592, 1287656862, 1289923706,
+                        1290006858, 1290007205, 1292332479,
+                        1292332731, 1292334625, 1295262137,
+                        1295264053, 1295270062, 1297845318,
+                        1297856502, 1300283068, 1300285031,
+                        1300286755, 1302783719, 1302852032,
+                        1305552626, 1305552905, 1308582513,
+                        1308583235, 1308734339 ), class =
+                      c("POSIXct", "POSIXt"))
+  current <- index(pidata)
+  checkEqualsNumeric(target, index(pidata))
+
+  target <- structure(c(1282645827, 1287647956, 1289923706,
+                        1292334625, 1295264053, 1300285031,
+                        1308734339), class = c("POSIXct", "POSIXt"))
+  current <- index(pidata[!is.na(pidata[,1])])
+  checkEqualsNumeric(target, current)
+
+  target <- structure(c(1282644388, 1284544972, 1287654592,
+                        1290006858, 1292332479, 1295262137,
+                        1297845318, 1300283068, 1302783719,
+                        1305552626, 1308582513), class =
+                      c("POSIXct", "POSIXt"))
+  current <- index(pidata[!is.na(pidata[,2])])
+  checkEqualsNumeric(target, current)
+
+  target <- structure(c(1282719141, 1284556921, 1287656862,
+                        1290007205, 1292332731, 1295270062,
+                        1297856502, 1300286755, 1302852032,
+                        1305552905, 1308583235 ), class =
+                      c("POSIXct", "POSIXt"))
+  current <- index(pidata[!is.na(pidata[,3])])
+  checkEqualsNumeric(target, current)
+
+}
+
+test.read.PI.is.irregular.TRUE.granularity.3600 <- function() {
+  pidata <- read.PI('data/peilschalen-3.xml', is.irregular=TRUE, step.seconds=3600)
+
+  target <- structure(c(1282647600, 1282719600, 1284548400,
+                        1284559200, 1287648000, 1287655200,
+                        1287658800, 1289926800, 1290009600,
+                        1292335200, 1295265600, 1295272800,
+                        1297846800, 1297857600, 1300284000,
+                        1300287600, 1302786000, 1302854400,
+                        1305554400, 1308585600, 1308736800), class =
+                        c("POSIXct", "POSIXt"))
+  current <- index(pidata)
+  checkEqualsNumeric(target, current)
+
+  checkEqualsNumeric(c(0.37, NA, NA), pidata[8])
+  checkEqualsNumeric(c(NA, -1.7, -1.79), pidata[9])
+  checkEqualsNumeric(c(0.37, -1.75, -1.79), pidata[10])
+}
+
+test.read.PI.timeZone.4.is.irregular.TRUE <- function() {
+  pidata <- read.PI('data/peilschalen-1-timezone-4.xml', is.irregular=TRUE)
+  target <- c(1302847200, 1302933600, 1303020000, 1303106400, 1303192800, 1303279200)
+  current <- as.seconds(index(pidata))
+  checkEquals(target, current)
+}
+
+test.read.PI.timeZone.4.is.irregular.FALSE <- function() {
+  pidata <- read.PI('data/peilschalen-1-timezone-4.xml')
+  target <- c(1302847200, 1302933600, 1303020000, 1303106400, 1303192800, 1303279200)
+  current <- as.seconds(index(pidata))
+  checkEquals(target, current)
+}
+
+test.read.PI.select.on.parameterId <- function() {
+  pidata <- read.PI('data/combined-3.xml', is.irregular=TRUE, step.seconds=3600)
+  checkEquals(5, ncol(pidata))
+  pidata <- read.PI('data/combined-3.xml', parameterId="WNSHDB38", is.irregular=TRUE, step.seconds=3600)
+  checkEqualsNumeric(3, ncol(pidata))
+}
+
+test.read.PI.select.on.two.parameterId <- function() {
+  pidata <- read.PI('data/combined-3.xml', is.irregular=TRUE, step.seconds=3600)
+  checkEquals(5, ncol(pidata))
+  pidata <- read.PI('data/combined-3.xml', parameterId=c("WNSHDB1", "WNSHDB3"), is.irregular=TRUE, step.seconds=3600)
+  checkEqualsNumeric(2, ncol(pidata))
+}
+
+test.read.PI.filter.timestamp <- function() {
+
+  peilschalen <- read.PI('data/combined-3.xml', parameterId="WNSHDB38", is.irregular=TRUE, step.seconds=60)
+
+  timestamps <- index(peilschalen)
+  passes <- function(candidate) {
+    index <- c(which(candidate < timestamps), -1)[[1]]
+    if(index == -1) return(FALSE)
+    return(as.seconds(difftime(timestamps[[index]], candidate)) < 86400)
+  }
+  
+  pidata <- read.PI('data/combined-3.xml', is.irregular=TRUE, parameterId=c("WNSHDB1", "WNSHDB3"), filter.timestamp=passes, step.seconds=60)
+
+  checkEquals(42, nrow(pidata))
+  checkEquals(c(1305459000, 1305477900, 1305481500, 1305482400, 1305485916, 
+                1305486900, 1305487716, 1305492300, 1305496800, 1305497700, 1305500400, 
+                1305500676, 1305517500, 1305525600, 1305526500, 1305535500, 1305540156, 
+                1305549000, 1305549900, 1308496716, 1308504600, 1308505500, 1308507276, 
+                1308508200, 1308512700, 1308519000, 1308519900, 1308521796, 1308522600, 
+                1308523476, 1308524400, 1308524556, 1308528996, 1308536100, 1308544200, 
+                1308545100, 1308550596, 1308559500, 1308564000, 1308564900, 1308572196, 
+                1308579300), as.seconds(index(pidata)))
+}
+
+test.read.PI.skip.short.lived.60 <- function() {
+
+  ## read twice the same data, select just the second column, then
+  ## check the effect of the optional parameter skip.short.lived
+  pidata <- read.PI('data/peilschalen-3-with-corrections.xml', is.irregular=TRUE, skip.short.lived=60)
+  corrected.peilschaal <- pidata[!is.na(pidata[, 2]), 2]
+  pidata <- read.PI('data/peilschalen-3-with-corrections.xml', is.irregular=TRUE)
+  uncorrected.peilschaal <- pidata[!is.na(pidata[, 2]), 2]
+
+  ## correction removes timestamps without altering any
+  checkTrue(all(index(corrected.peilschaal) %in% index(uncorrected.peilschaal)))
+  ## third timestamp gets removed
+  checkEquals(c(TRUE, TRUE, FALSE), (index(uncorrected.peilschaal) %in% index(corrected.peilschaal))[1:3])
+  ## only one timestamp is removed
+  checkEquals(1, length(index(uncorrected.peilschaal)) - length(index(corrected.peilschaal)))
+}
+
+test.read.PI.filter.timestamp.small <- function() {
+
+  peilschalen <- read.PI('data/combined-small-3.xml', parameterId="WNSHDB38", is.irregular=TRUE, step.seconds=60)
+
+  timestamps <- index(peilschalen)
+  passes <- function(candidate) {
+    index <- c(which(candidate < timestamps), -1)[[1]]
+    if(index == -1) return(FALSE)
+    return(as.seconds(difftime(timestamps[[index]], candidate)) < 86400)
+  }
+  
+  pidata <- read.PI('data/combined-small-3.xml', is.irregular=TRUE, parameterId="WNSHDB1", filter.timestamp=passes, step.seconds=60)
+
+  checkEquals(6, nrow(pidata))
+  checkEquals(c(1305459000, 1305492300, 1308521796, 1308523476, 1308544200, 1308579300), as.seconds(index(pidata)))
+}
+
+test.read.PI.univariate.as.matrix <- function() {
+  pidata <- read.PI('data/peilschalen-1-timezone-4.xml')
+  checkEqualsNumeric(2, length(dim(pidata)))
+}
+
+test.read.PI.multivariate.as.matrix <- function() {
+  pidata <- read.PI('data/peilschalen-3-with-corrections.xml')
+  checkEqualsNumeric(2, length(dim(pidata)))
+}
+
+test.read.PI.first.series.empty <- function() {
+  pidata <- read.PI('data/first-series-empty.xml', is.irregular=TRUE)
+  checkEqualsNumeric(c(11, 2), dim(pidata))
+  checkTrue(all(is.na(pidata[, 1])))
+  checkTrue(!all(is.na(pidata[, 2])))
+}
+
+test.read.PI.second.series.empty <- function() {
+  pidata <- read.PI('data/second-series-empty.xml', is.irregular=TRUE)
+  checkEqualsNumeric(c(11, 2), dim(pidata))
+  checkTrue(!all(is.na(pidata[, 1])))
+  checkTrue(all(is.na(pidata[, 2])))
+}
+
+test.read.PI.first.series.empty.equidistant <- function() {
+  pidata <- read.PI('data/first-series-empty-equidistant.xml')
+  checkEqualsNumeric(c(11, 3), dim(pidata))
+  checkTrue(all(is.na(pidata[, 1])))
+  checkTrue(!all(is.na(pidata[, 2])))
+  checkTrue(!all(is.na(pidata[, 3])))
+}
+
+test.read.PI.first.series.empty.equidistant.with.holes <- function() {
+  pidata <- read.PI('data/first-series-empty-equidistant-with-holes.xml', is.irregular=TRUE)
+  checkEqualsNumeric(c(10, 3), dim(pidata))
+  checkTrue(all(is.na(pidata[, 1])))
+  checkEquals(c(2, 4, 9), which(is.na(pidata[, 2])))
+  checkEquals(c(7), which(is.na(pidata[, 3])))
+}
+
+test.read.PI.empty.equidistant.with.holes <- function() {
+  pidata <- read.PI('data/equidistant-with-holes.xml', is.irregular=TRUE)
+  checkEqualsNumeric(c(10, 2), dim(pidata))
+  checkEquals(c(2, 4, 9), which(is.na(pidata[, 1])))
+  checkEquals(c(7), which(is.na(pidata[, 2])))
 }
 
 test.write.PI.na.missing.elements <- function() {
@@ -124,9 +316,9 @@ test.write.PI.na.NULL.elements <- function() {
                      locationId='600-P1201', parameterId='WNS954-differences',
                      timeStep=1440, startDate=20910240, endDate=20931840)
 
-  result <- timeseries(P1201=diff(pidata['lp.600-P1201.WNS954']), order.by=index(pidata)[-1])
+  result <- timeseries(P1201=diff(pidata[, 'lp.600-P1201.WNS954']), order.by=index(pidata)[-1])
 
-  conf$missVal <- "NULL"
+  conf$missVal <- NULL
   write.PI(result, conf, 'data/test.write.PI.na.1.xml.current')
   expect <- readLines('data/test.write.PI.na.1.xml.target')
   current <- readLines('data/test.write.PI.na.1.xml.current')
@@ -243,7 +435,7 @@ test.write.PI.no.events <- function() {
 
   conf <- data.frame(column=c('column1', 'column2'), type='instantaneous',
                      locationId=c('P1201', 'P1202'), parameterId='WNS954',
-                     timeStep=5*60, startDate=20576130*60, endDate=20576175*60)
+                     timeStep=5*60)
 
   conf$missVal <- NULL # causes empty line
 
@@ -266,6 +458,56 @@ test.write.PI.one.event <- function() {
   write.PI(pidata, conf, 'data/test.write.PI.one.event.current')
   expect <- readLines('data/test.write.PI.one.event.target')
   current <- readLines('data/test.write.PI.one.event.current')
+  checkEquals(current, expect)
+}
+
+test.write.PI.missVal.NA.InfVal.999.content.one.Inf.further.empty <- function() {
+  ## the data contains in this case, you want only one event
+  pidata <- zoo(cbind(a=NA, b=NA), order.by=structure(seq(0,86400,21600), class = c("POSIXct","POSIXt")))
+  ts <- index(pidata)
+
+  pidata[ts[3], 'b'] <- Inf
+
+  conf <- data.frame(column=c('a', 'b'), type='instantaneous',
+                     locationId='600-P1201', parameterId=c('a', 'b'),
+                     timeStep=1440, startDate=20910240, endDate=20931840)
+
+  conf$missVal <- NULL  # removed column, elements will be missing
+  conf$InfVal <- -999  # 
+  write.PI(pidata, conf, 'data/write.PI.missVal.NA.InfVal.999.content.one.Inf.further.empty.current')
+  expect <- readLines('data/write.PI.missVal.NA.InfVal.999.content.one.Inf.further.empty.target')
+  current <- readLines('data/write.PI.missVal.NA.InfVal.999.content.one.Inf.further.empty.current')
+  checkEquals(current, expect)
+}
+
+test.write.PI.missVal.NA.InfVal.999.content.one.Inf.further.empty.no.time.indication <- function() {
+  ## the data contains in this case, you want only one event
+  pidata <- zoo(cbind(a=NA, b=NA), order.by=structure(seq(0,86400,21600), class = c("POSIXct","POSIXt")))
+  ts <- index(pidata)
+
+  pidata[ts[3], 'b'] <- Inf
+
+  conf <- data.frame(column=c('a', 'b'), type='instantaneous',
+                     locationId='600-P1201', parameterId=c('a', 'b'),
+                     timeStep=1440)
+
+  conf$missVal <- NULL  # removed column, elements will be missing
+  conf$InfVal <- -999  # 
+  write.PI(pidata, conf, 'data/write.PI.missVal.NA.InfVal.999.content.one.Inf.further.empty.no.time.indication.current')
+  expect <- readLines('data/write.PI.missVal.NA.InfVal.999.content.one.Inf.further.empty.no.time.indication.target')
+  current <- readLines('data/write.PI.missVal.NA.InfVal.999.content.one.Inf.further.empty.no.time.indication.current')
+  checkEquals(current, expect)
+}
+
+test.write.PI.no.data.description <- function() {
+  ## the data contains in this case, you want only one event
+  pidata <- zoo(cbind(lp.locA.par1=1:2, lp.locB.par2=101:102),
+                order.by=structure(seq(0,21600,21600), class = c("POSIXct","POSIXt")))
+  ts <- index(pidata)
+
+  write.PI(pidata, filename='data/write.PI.no.data.description.current')
+  expect <- readLines('data/write.PI.no.data.description.target')
+  current <- readLines('data/write.PI.no.data.description.current')
   checkEquals(current, expect)
 }
 

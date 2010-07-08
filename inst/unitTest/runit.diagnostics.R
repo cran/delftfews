@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.diagnostics.R 60 2011-02-02 12:41:26Z mariotomo $
+## $Id: runit.diagnostics.R 84 2011-08-05 12:45:50Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -20,7 +20,7 @@
 require(svUnit)
 
 logged <- NULL
-mockAction <- function(msg, handler) {
+mockAction <- function(msg, handler, ...) {
   ## replace the timestamp with a constant string!
   parts <- unlist(strsplit(msg, " :: ", fixed=TRUE))
   parts[2] <- "TS"
@@ -30,7 +30,7 @@ mockAction <- function(msg, handler) {
 
 test.formatter.fewsdiagnostics.simple <- function() {
   logReset()
-  addHandler(mockAction, level='DEBUG', logger='', formatter=delftfews:::formatter.fewsdiagnostics)
+  addHandler(mockAction, action=mockAction, level='DEBUG', logger='', formatter=delftfews:::formatter.fewsdiagnostics)
   logged <<- NULL
   loginfo("a simple string")
   checkEquals('  <line level="3" description="LizardScripter :: TS :: a simple string"/>\n', logged)

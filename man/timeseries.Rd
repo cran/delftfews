@@ -1,12 +1,8 @@
-% $Id: timeseries.Rd 30 2010-08-11 13:51:42Z mariotomo $
+% $Id: timeseries.Rd 91 2011-08-09 13:17:37Z mariotomo $
 
 \name{timeseries}
 \alias{timeseries}
-\alias{$.delftfews}
-\alias{$<-.delftfews}
-\alias{[.delftfews}
-\alias{[<-.delftfews}
-\title{overriding zoo creator and accessors}
+\title{extra zoo creator}
 \description{
   
   using three of the four \code{from}, \code{to}, \code{by},

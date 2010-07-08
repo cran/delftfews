@@ -1,5 +1,5 @@
 export(as.seconds,
-       cumulate.timeseries,
+       cumulate,
        contiguous.stretch,
        double.threshold,
        findLocalMin,
@@ -13,8 +13,6 @@ export(as.seconds,
        read.PI,
        read.dcf.parsed,
        read.sheet,
-       rollapply.delftfews,
-       rollapply.default,
        rollingSum,
        select.percentiles,
        setup.fewsdiagnostics,
@@ -28,15 +26,12 @@ export(as.seconds,
        timestamp.in.range.weekday,
        timestamp.in.weekend,
        write.PI,
-       Ops.zoo, # modified from new version
-       "$.zoo", # UNmodified from new version
-       "$<-.zoo", # modified from new version
-       "[<-.zoo", # modified from new version
-       "[.zoo", # modified from new version
-       "[<-.delftfews",
-       "[.delftfews",
-       "$<-.delftfews",
-       "$.delftfews")
+       "[.zoo",
+       "$.zoo",
+       "$<-.zoo",
+       XmlDoc)
+
+S3method(cumulate, zoo)
 
 S3method(double.threshold, default)
 S3method(double.threshold, data.frame)

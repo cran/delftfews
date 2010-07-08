@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: timeseries-io.R 67 2011-03-14 14:20:45Z mariotomo $
+## $Id: timeseries-io.R 122 2011-09-20 14:37:43Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -28,10 +28,11 @@ EPOCH <- as.POSIXct("1970-01-01 00:00:00", "%Y-%m-%d %H:%M:%S", tz="UTC")
 require("XML")
 require("logging")
 
-read.PI <- function(filename, step.seconds=NA, na.action=na.fill) {
+read.PI <- function(filename, step.seconds=NA, na.action=na.fill, parameterId, is.irregular=FALSE, filter.timestamp, skip.short.lived=NA) {
   ## creates a data.frame containing all data in matrix form.
+  isToBeFiltered <- !missing(filter.timestamp)
 
-  groupByStep <- function(seconds, values, step.seconds, flags=NA, missVal=NA) {
+  groupByStep <- function(seconds, values, step.seconds, flags=NA, missVal=NA, keepThese=TRUE) {
     ## groups the values by seconds, one each step.
     ##
     ## a value may be NA, or be flagged as NA (flag 9), or be equivalent
@@ -45,10 +46,16 @@ read.PI <- function(filename, step.seconds=NA, na.action=na.fill) {
       values[flags == 9] <- NA
 
     if(length(!is.na(values)) > 0) {
-      result <- aggregate(values, by=list(ceiling(seconds/step.seconds)*step.seconds), function(x) tail(x, n=1))
+      ## start counting steps from first second, not from 1970-01-01
+      base <- seconds[1]
+      seconds <- seconds - base
+
+      result <- aggregate(values[keepThese], by=list(ceiling(seconds[keepThese]/step.seconds)*step.seconds), function(x) tail(x, n=1))
       colnames(result) <- c('s', "v")
+
+      result$s <- result$s + base
     } else {
-      result <- subset(data.frame(s='', v=FALSE), c(FALSE))
+      result <- structure(list(s = numeric(0), v = numeric(0)), .Names = c("s", "v"), class = "data.frame")
     }
 
     return (result)
@@ -59,22 +66,26 @@ read.PI <- function(filename, step.seconds=NA, na.action=na.fill) {
   ## columns corresponding to each series nodes.
 
   ## Read XML file
-  doc <- xmlTreeParse(filename)
-  TimeSeriesNode <- xmlRoot(doc)
+  doc <- XmlDoc$new(filename)
 
   ## time offset in seconds from the timeZone element (which is in hours)
-  timeOffset <- as.double(xmlValue(TimeSeriesNode[["timeZone"]])) * 60 * 60
+  timeOffset <- as.double(doc$getText("/TimeSeries/timeZone")) * 60 * 60
 
   ## we only operate on the "series" nodes.
-  seriesNodes <- xmlElementsByTagName(TimeSeriesNode, "series")
+  if(missing(parameterId)) {
+    seriesNodes <- doc$.getNodeSet("/TimeSeries/series")
+    headerNodes <- doc$.getNodeSet("/TimeSeries/series/header")
+  } else {
+    seriesNodes <- doc$.getNodeSet(paste("/TimeSeries/series[", paste(sprintf("./header/parameterId='%s'", parameterId), collapse=" or "), "]", sep=""))
+    headerNodes <- doc$.getNodeSet(paste("/TimeSeries/series/header[", paste(sprintf("./parameterId='%s'", parameterId), collapse=" or "), "]", sep=""))
+  }
 
   ## reset the name of the elements in seriesNodes from the general
   ## "series" to "lp".location.parameter
-  getSeriesName <- function(node) {
-    headerValues <- xmlSApply(node[["header"]], xmlValue)
-    paste("lp", headerValues$locationId, headerValues$parameterId, sep=".")
-  }
-  names(seriesNodes) <- mapply(getSeriesName, seriesNodes)
+  lp <- sapply(c("locationId", "parameterId"),
+               function(name) sapply(headerNodes, function(el) xmlValue(xmlElementsByTagName(el, name)[[1]])),
+               simplify=FALSE)
+  names(seriesNodes) <- paste("lp", lp$locationId, lp$parameterId, sep=".")
 
   ## scan the document to find the first and the last (step-valid)
   ## timestamps.  use them to initialize the result data.frame.
@@ -88,34 +99,8 @@ read.PI <- function(filename, step.seconds=NA, na.action=na.fill) {
     as.numeric(difftime(timestamps, EPOCH, tz="UTC"), units="secs")
   }
 
-  seconds <- sapply(seriesNodes, getElementSeconds, tagname='event')
-
-  if(max(sapply(seconds, length)) == 0) {
-    ## we have only series without events, so we make a fictive
-    ## `seconds` list from startDate, endDate and `step.seconds`.
-    if (is.na(step.seconds))
-      stop("no events, we really need `step.seconds`.")
-    getHeaderSeconds <- function(node, tagname) {
-      headerNodeList <- xmlElementsByTagName(node, 'header')
-      startDate <- sapply(headerNodeList, getElementSeconds, tagname='startDate')
-      endDate <- sapply(headerNodeList, getElementSeconds, tagname='endDate')
-      seq(from=startDate, to=endDate, by=step.seconds)
-    }
-    seconds <- sapply(seriesNodes, getHeaderSeconds)
-  }
-
-  if (is.na(step.seconds))
-    step.seconds <- get.step(seconds)
-
-  startsAndEnds <- range(seconds)
-  first <- floor(startsAndEnds[1]/step.seconds)*step.seconds
-  last <- ceiling(startsAndEnds[2]/step.seconds)*step.seconds
-
-  ## result zoo is indexed on timestamps.  you can retrieve them using the `index` function.
-  result.index <- EPOCH + seq(from=first, to=last, by=step.seconds) - timeOffset
-
   ## finally extract all the timestamped values and fill in the blanks
-  getValues <- function(node) {
+  getValues <- function(node, as.zoo=FALSE) {
     ## get the values as a named column
     header <- xmlElementsByTagName(node, "header")[[1]]
     missVal <- xmlElementsByTagName(header, 'missVal')[[1]]
@@ -130,15 +115,115 @@ read.PI <- function(filename, step.seconds=NA, na.action=na.fill) {
     timestamps <- as.POSIXct(paste(dates, times), "%Y-%m-%d %H:%M:%S", tz="UTC")
     seconds <- as.numeric(difftime(timestamps, EPOCH, tz="UTC"), units="secs")
 
-    grouped <- groupByStep(seconds, values, step.seconds, flags, missVal)
-    column <- rep(NA, length(result.index))
-    column[as.seconds(result.index) %in% (grouped$s - timeOffset)] <- grouped$v
-    na.action(column)
+    if(!is.na(skip.short.lived)) {
+      grouped <- groupByStep(seconds, values, step.seconds, flags, missVal, c(diff(seconds) > skip.short.lived, TRUE))
+    } else {
+      grouped <- groupByStep(seconds, values, step.seconds, flags, missVal)
+    }
+
+    ## 3106 - this is the place for filtering the data.  we just read
+    ## it, modified according to the settings, but we have not yet
+    ## stored it in the partial result.
+
+    if(isToBeFiltered) {
+      old.length <- length(grouped$v)
+      if(old.length > 0) {
+        validTimestamps <- sapply(EPOCH + grouped$s - timeOffset, filter.timestamp)
+        logfinest("surviving timestamps: %s", validTimestamps)
+        grouped <- grouped[validTimestamps, ]
+      }
+      logdebug("filtering, %d/%d values survive", length(grouped$v), old.length)
+    }
+
+    if(as.zoo) {
+      result <- zoo(cbind(grouped$v), order.by=EPOCH + grouped$s - timeOffset)
+    } else {
+      column <- rep(NA, length(result.index))
+      column[as.seconds(result.index) %in% (grouped$s - timeOffset)] <- grouped$v
+      result <- na.action(column)
+    }
+    return(result)
   }
 
-  ## column-bind the timestamps to the collected values
-  result <- zoo(cbind(mapply(getValues, seriesNodes)), order.by=result.index, frequency=1.0/step.seconds)
-  class(result) <- c("delftfews", class(result))
+  seconds <- sapply(seriesNodes, getElementSeconds, tagname='event')
+
+  if(is.irregular) {
+    if (is.na(step.seconds)) {  # here step.seconds means granularity and must be set.
+      ## no granularity means keep data precise to the second.
+      step.seconds <- 1
+    }
+
+    result <- zoo(order.by=structure(numeric(0), class=c("POSIXct", "POSIXt")))
+    dim(result) <- c(0, 0)
+
+    for(name in names(seriesNodes)) {
+      logdebug("doing column '%s'", name)
+      item <- getValues(seriesNodes[[name]], as.zoo=TRUE)
+      if(nrow(item) == 0) {
+        item <- zoo(cbind(v=NA), order.by=index(result))
+      }
+      ## TODO_01: this is a workaround on a zoo problem.  only two
+      ## lines ought to be needed and are clearly marked in this
+      ## block.
+      if(dim(result)[1] == 0) {
+        cn <- c(colnames(result), name)
+        dim(result)[2] <- dim(result)[2] + 1
+        colnames(result) <- cn
+        if(dim(item)[1] != 0) {
+          result <- zoo(order.by=index(item))
+          for(n in cn)
+            result <- cbind(result, NA)
+          colnames(result) <- cn
+          result[, name] <- item
+        }
+      } else {
+        colnames(item) <- name  # THIS LINE SURVIVES AFTER BUG SOLVING
+        if(dim(item)[1] == 0) {
+          actually <- item
+          item <- result[, 1]
+          faking <- TRUE
+        } else {
+          faking <- FALSE
+        }
+        result <- cbind(result, item)  # THIS LINE SURVIVES AFTER BUG SOLVING
+        if(faking)
+          result[, ncol(result)] <- NA
+      }
+      ## END_01
+    }
+
+  } else {
+
+    if(all(lapply(seconds, length) == 0)) {
+      ## we have only series without events, so we make a fictive
+      ## `seconds` list from startDate, endDate and `step.seconds`.
+      if (is.na(step.seconds))
+        stop("no events, we really need `step.seconds`.")
+      getHeaderSeconds <- function(node, tagname) {
+        headerNodeList <- xmlElementsByTagName(node, 'header')
+        startDate <- sapply(headerNodeList, getElementSeconds, tagname='startDate')
+        endDate <- sapply(headerNodeList, getElementSeconds, tagname='endDate')
+        seq(from=startDate, to=endDate, by=step.seconds)
+      }
+      seconds <- sapply(seriesNodes, getHeaderSeconds)
+    }
+
+    if (is.na(step.seconds)) {
+      step.seconds <- get.step(seconds)
+    }
+    startsAndEnds <- range(seconds)
+    first <- startsAndEnds[1]
+    last <- first + ceiling(diff(startsAndEnds) / step.seconds) * step.seconds
+
+    ## result zoo is indexed on timestamps.  you can retrieve them using the `index` function.
+    result.index <- EPOCH + seq(from=first, to=last, by=step.seconds) - timeOffset
+    if(isToBeFiltered)
+      result.index <- result.index[sapply(result.index, filter.timestamp)]
+
+    ## column-bind the timestamps to the collected values.  column names are taken from names(seriesNodes).
+    result <- zoo(cbind(mapply(getValues, seriesNodes)), order.by=result.index, frequency=1.0/step.seconds)
+  }
+  
   return(result)
 }
 
@@ -148,7 +233,6 @@ write.PI <- function(data, data.description, filename, global.data)
 
 write.PI.data.frame <- function(data, data.description, filename, global.data=NA) {
   data <- zoo(data[-1], order.by=data$timestamps)
-  class(data) <- c('delftfews', class(data))
   return(write.PI.zoo(data, data.description, filename, global.data=global.data))
 }
 
@@ -160,6 +244,17 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
   ## type locationId  parameterId missVal units column
   ##1 instantaneous 155 Ai2 -999.0 m^3/min result
   ##2 instantaneous 156 Ai3 -999.0 mmHg check
+
+  if(missing(data.description)) {
+    data.description <- data.frame(column=colnames(data),
+                                   type='instantaneous',
+                                   locationId=sapply(strsplit(colnames(data), '.', fixed=TRUE), function(x) x[2]),
+                                   parameterId=sapply(strsplit(colnames(data), '.', fixed=TRUE), function(x) paste(x[-(1:2)], collapse='.')),
+                                   units='-',
+                                   InfVal=-999,
+                                   stationName='-',
+                                   longName='-')
+  }
 
   timeStep <- get.step(data)
 
@@ -182,7 +277,7 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
 
     ## cut uninteresting columns
     actualdata <- data.frame(seconds = as.seconds(index(data)))
-    actualdata$column <- as.vector(data[item['column']])
+    actualdata$column <- as.vector(data[, item[['column']]])
     ## cut rows that generate no 'event' node.
     if(looksLikeNULL(item, 'missVal')) {
       actualdata <- subset(actualdata, !is.na(column))
@@ -191,12 +286,17 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
       actualdata <- subset(actualdata, !is.infinite(column))
     }
 
-    if(length(actualdata$column) == 0)
-      return(invisible())
-
     ## what are the true start and end instants of this series?
-    start <- EPOCH + min(actualdata$seconds)
-    end <- EPOCH + max(actualdata$seconds)
+    if(nrow(actualdata) != 0) {
+      start <- EPOCH + min(actualdata$seconds)
+      end <- EPOCH + max(actualdata$seconds)
+    } else {
+      start <- end <- EPOCH
+      if('startDate' %in% names(item))
+        start <- EPOCH + as.numeric(item[['startDate']]) * 60
+      if('endDate' %in% names(item))
+        end <- EPOCH + as.numeric(item[['endDate']]) * 60
+    }
 
     tsDate <- function(x) { format.POSIXct(x, format="%Y-%m-%d") }
     tsTime <- function(x) { format.POSIXct(x, format="%H:%M:%S") }
@@ -208,7 +308,7 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
       value <- as.numeric(i[2])
 
       missingValueNode <- function(name) {
-        if(any(is.na(data.description[[name]])))
+        if(looksLikeNULL(item, name) || is.na(item[[name]]) || is.nan(item[[name]]))
           ## write 0 and flag the value to "9"
           xmlNode(name = 'event', attrs=c(date=tsDate(ts), time=tsTime(ts), value=0, flag=9))
         else
@@ -235,6 +335,8 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
     else
       timeStepNode <- xmlNode('timeStep', attrs=c(unit="second", multiplier=timeStep))
 
+    ## NOTA BENE: elements in the header must respect the order
+    ## specified in the xsd.  FEWS will not read the file otherwise.
     headerNode <- xmlNode('header',
                           xmlNode('type', item[['type']]),
                           xmlNode('locationId', item[['locationId']]),
@@ -243,6 +345,9 @@ write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
                           xmlNode('startDate', attrs=c(date=tsDate(start), time=tsTime(start))),
                           xmlNode('endDate', attrs=c(date=tsDate(end), time=tsTime(end)))
                           )
+
+    if(looksLikeNULL(item, 'missVal') && !looksLikeNULL(item, 'InfVal') && !is.na(item['InfVal']))
+        headerNode <- addChildren(headerNode, kids=list(xmlNode('missVal', item[['InfVal']])))
 
     for (name in c('missVal', 'longName','stationName', 'units'))
       if (!looksLikeNULL(item, name) & !is.na(item[name]))

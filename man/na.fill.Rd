@@ -1,4 +1,4 @@
-% $Id: na.fill.Rd 2 2010-07-07 13:40:59Z mariotomo $
+% $Id: na.fill.Rd 126 2011-09-21 14:05:59Z mariotomo $
 
 \name{na.fill}
 \alias{na.fill}
@@ -32,4 +32,9 @@ na.interpolate(object)
 }
 \arguments{
   \item{object}{the vector, possibly containing NA values.}
+}
+\examples{
+na.fill(c(1,2,3,NA))  # propagates the 3 forward
+na.fill(c(NA,2,3,4))  # propagates the 2 backward
+na.fill(c(NA,2,NA,NA))  # propagates the 2 backward and forward
 }

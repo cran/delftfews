@@ -1,34 +1,36 @@
-% $Id: cumulate.Rd 68 2011-06-24 10:02:52Z mariotomo $
+% $Id: cumulate.Rd 99 2011-08-11 09:30:41Z mariotomo $
 
 \name{cumulate}
 \alias{cumulate}
-\alias{cumulate.timeseries}
-\title{augments a time series set with net and gross sums of one data column}
+\alias{cumulate.zoo}
+\title{augments a time series with net and gross sums of one data column}
 \description{
   
-  performs a discrete integration.  given the `input` timeseries set,
-  uses its `minutes` data and the indicated `column` data to compute the
-  integral value of the data.
+  given the univariate `input` timeseries, performs a discrete
+  integration of its non-zero stretches of data.
 
+}
+\details{
   stretches are integrated "net" and "gross", where the gaps between
   "gross" stretches are at most `gap` wide.
 
   numeric values thus computed can be seen as events and they are
-  located at the timestamp of the earliest number of the stretch.  all
-  other entries are `NA`.
+  located at the timestamp of the earliest non-zero entry of the
+  stretch.  all other entries are `NA`.
 
   it's best to specify `data.description$missVal = NULL` when passing
-  the result of `cumulate.timeseries` to `write.PI`.  `NA` events (no
+  the result of `cumulate.zoo to `write.PI`.  `NA` events (no
   event) will be omitted.
-  
 }
 \usage{
-cumulate.timeseries(input, column = "input", gap = 1,
-                    integration.method = 3, units = "secs")
+
+cumulate(input, gap = 1, integration.method = 3, with.partials = FALSE, \dots)
+\method{cumulate}{zoo}(input, gap = 1, integration.method = 3, with.partials =
+FALSE, units="secs", skip.first = FALSE, \dots)
+
 }
 \arguments{
-  \item{input}{data.frame; the time series set to be augmented.}
-  \item{column}{character; the name of the data holding column.}
+  \item{input}{zoo; an univariate zoo series, indexed on POSIXct timestamps.}
   \item{gap}{numeric; the size of the minimal gap that interrupts gross stretches.}
   \item{integration.method}{numeric; refers to the overview presented
     in http://portal.acm.org/citation.cfm?id=578374, figure 7.2.  1:
@@ -37,9 +39,21 @@ cumulate.timeseries(input, column = "input", gap = 1,
   \item{units}{character; this is passed to as.double for converting
     differences in timestamps.  all units
     acceptable there can be used here.}
+  \item{with.partials}{logic; whether the output should contain the
+    partials used in the calculations.  in this case, this will be the
+    fifth column in the output.}
+  \item{skip.first}{logic: whether an event at the very first timestamp
+    should be skipped.  you might consider an event on the first
+    timestamp as suspect, as you probably missed the true beginning,
+    occurring before the start of the available data.}
+  \item{\dots}{placeholder for future extensions}
 }
 \examples{
 input <- c(0, 0, 0, 5, 6, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0)
-result <- timeseries(20580000, by=5, length.out=length(input), input=input)
-cumulate.timeseries(result, gap=3)
+
+inputAsDelftfews <- timeseries(20580000, by=5, length.out=length(input), input=input)
+cumulate(inputAsDelftfews, gap=3)
+
+inputAsZoo <- zoo(input, order.by = structure(seq(20580000, 20580075, 5), class = c("POSIXct","POSIXt")))
+cumulate(inputAsZoo, gap=3)
 }
