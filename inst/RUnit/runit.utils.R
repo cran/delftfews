@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: runit.utils.R 5 2010-07-08 11:15:10Z mariotomo $
+## $Id: runit.utils.R 19 2010-08-06 15:06:01Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -219,14 +219,192 @@ test.shift.vector <- function() {
   checkEquals(c(1, 2, 3), shift.vector(c(1, 2, 3), 0))
 }
 
-test.contiguous.stretch <- function() {
-  DEACTIVATED("contiguous.stretch is not tested.")
+test.contiguous.stretch.1 <- function() {
+  ## all adjacent values
+  input <- c(1,1,1,2,2,2,3,3,2,2)
+  current <- contiguous.stretch(input, 1)
+  target <- rep(FALSE, length(input))
+  target[1:3] <- TRUE
+  checkEquals(target, current)
+}
+
+test.contiguous.stretch.2 <- function() {
+  ## starting at different position, but finding the same value as test.1
+  input <- c(1,1,1,2,2,2,3,3,2,2)
+  current <- contiguous.stretch(input, 3)
+  target <- rep(FALSE, length(input))
+  target[1:3] <- TRUE
+  checkEquals(target, current)
+}
+
+test.contiguous.stretch.3 <- function() {
+  ## starting at different position, finding other value than test.1
+  ## and 2.  notice this will not return the last two positions, which
+  ## are not adjacent to the stretch.
+  input <- c(1,1,1,2,2,2,3,3,2,2)
+  current <- contiguous.stretch(input, 5)
+  target <- rep(FALSE, length(input))
+  target[4:6] <- TRUE
+  checkEquals(target, current)
+}
+
+test.contiguous.stretch.4 <- function() {
+  ## the value is not found at position, so the result is all FALSE
+  input <- c(1,1,1,2,2,2,3,3,2,2)
+  current <- contiguous.stretch(input, 1, 2)
+  target <- rep(FALSE, length(input))
+  checkEquals(target, current)
+}
+
+test.contiguous.stretch.5 <- function() {
+  ## stretch of values different from 2, starting at positon 1
+  input <- c(1,1,1,2,2,2,3,3,2,2)
+  current <- contiguous.stretch(input, 1, 2, FALSE)
+  target <- rep(FALSE, length(input))
+  target[1:3] <- TRUE
+  checkEquals(target, current)
+}
+
+test.contiguous.stretch.6 <- function() {
+  ## stretch of values different from 3, starting at positon 1
+  input <- c(1,1,1,2,2,2,3,3,2,2)
+  current <- contiguous.stretch(input, 1, 3, FALSE)
+  target <- rep(FALSE, length(input))
+  target[1:6] <- TRUE
+  checkEquals(target, current)
+}
+
+test.contiguous.stretch.7 <- function() {
+  ## stretch of values different from 4, starting at positon 1
+  input <- c(1,1,1,2,2,2,3,3,2,2)
+  current <- contiguous.stretch(input, 1, 4, FALSE)
+  target <- rep(TRUE, length(input))
+  checkEquals(target, current)
 }
 
 test.get.step <- function() {
-  DEACTIVATED("get.step is not tested.")
+  ## testing unexported function
+  get.step <- delftfews:::get.step
+  
+  L <- list(a=cumsum(c(1,3,3,2,3,3,4,3,2,3,3)), b=cumsum(c(2,3,2,3)))
+  checkEquals(3, get.step(L))
+  L <- data.frame(a=c(2,4,6,8,12,14,18), b=c(12,14,16,18,22,24,28))
+  checkEquals(2, get.step(L))
+  L <- matrix(c(2,4,6,8,12,14,18, 12,14,16,18,22,24,28), 7, 2)
+  checkEquals(2, get.step(L))
 }
 
-test.sum.first <- function() {
-  DEACTIVATED("sum.first is not tested.")
+test.double.threshold.0 <- function() {
+  ## start below lower (false) threshold
+  values <- c(0, 2, 3, 2, 1, 0)
+  target <- c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE)
+  current <- double.threshold(values, 1, 2)
+  checkEquals(target, current)
 }
+
+test.double.threshold.1 <- function() {
+  ## start between thresholds, default initial value FALSE
+  values <- c(1, 2, 3, 2, 1, 0)
+  target <- c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE)
+  current <- double.threshold(values, 1, 2)
+  checkEquals(target, current)
+}
+
+test.double.threshold.2 <- function() {
+  ## start between thresholds, explicit initial value TRUE
+  values <- c(1, 2, 3, 2, 1, 0)
+  target <- c(TRUE, TRUE, TRUE, TRUE, TRUE, FALSE)
+  current <- double.threshold(values, 1, 2, TRUE)
+  checkEquals(target, current)
+}
+
+test.double.threshold.3 <- function() {
+  ## start below false threshold, ignores initial value TRUE
+  values <- c(0, 2, 3, 2, 1, 0)
+  target <- c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE)
+  current <- double.threshold(values, 1, 2, TRUE)
+  checkEquals(target, current)
+}
+
+test.double.threshold.data.frame.1 <- function() {
+  values <- data.frame(a=c(0, 2, 3, 2, 1, 0), b=c(0, 2, 3, 2, 1, 0))
+  target <- data.frame(a=c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE), b=c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE))
+  current <- double.threshold(values, 1, 2, TRUE)
+  checkEquals(target, current)
+}
+
+test.multi.double.threshold.vector.1 <- function() {
+  ## vector, four thresholds, initial TRUE.
+
+  values <- c(1, 2, 3, 4, 5, 4, 3, 2, 1)
+  thresholds <- data.frame(false=1:4-0.01, true=1:4+0.01)
+  current <- multi.double.threshold(values, thresholds, TRUE)
+  target <- c(1, 1, 2, 3, 4, 4, 3, 2, 1)
+  checkEquals(target, current)
+}
+
+test.multi.double.threshold.data.frame.0 <- function() {
+  ## data.frame, one column, four thresholds, initial default.
+
+  values <- data.frame(a=c(1, 2, 3, 4, 5, 4, 3, 2, 1))
+  thresholds <- data.frame(false=1:4-0.01, true=1:4+0.01)
+  current <- multi.double.threshold(values, thresholds)
+  target <- data.frame(a=c(0, 1, 2, 3, 4, 4, 3, 2, 1))
+  checkEquals(target, current)
+}
+
+test.multi.double.threshold.data.frame.1 <- function() {
+  ## data.frame(one column), four thresholds, initial TRUE.
+
+  values <- data.frame(a=c(1, 2, 3, 4, 5, 4, 3, 2, 1))
+  thresholds <- data.frame(false=1:4-0.01, true=1:4+0.01)
+  current <- multi.double.threshold(values, thresholds, TRUE)
+  target <- data.frame(a=c(1, 1, 2, 3, 4, 4, 3, 2, 1))
+  checkEquals(target, current)
+}
+
+test.multi.double.threshold.data.frame.2 <- function() {
+  ## data.frame(two columns), four thresholds, initial TRUE.
+
+  values <- data.frame(a=c(1, 2, 3, 4, 5, 4, 3, 2, 1), b=c(1, 2, 3, 4, 5, 4, 3, 2, 1))
+  thresholds <- data.frame(false=1:4-0.01, true=1:4+0.01)
+  current <- multi.double.threshold(values, thresholds, TRUE)
+  target <- data.frame(a=c(1, 1, 2, 3, 4, 4, 3, 2, 1), b=c(1, 1, 2, 3, 4, 4, 3, 2, 1))
+  checkEquals(target, current)
+}
+
+## testing unexported extremes(x, count)
+extremes <- delftfews:::extremes
+
+test.extremes.too.short <- function() {
+  ## x shorter than count, does not complain
+  values <- c(1,2,3)
+  target <- c(2, 2)
+  current <- extremes(values, 8)
+  checkEquals(target, current)
+}
+
+test.extremes.emtpy <- function() {
+  ## x empty: returns pair of NA
+  values <- c()
+  target <- c(NA_real_, NA_real_)
+  current <- extremes(values, 8)
+  checkEquals(target, current)
+}
+
+test.extremes.correct.1 <- function() {
+  ## normal usage on sorted data
+  values <- c(1,2,3,4,5,6,7,8,9)
+  target <- c(2, 8)
+  current <- extremes(values, 3)
+  checkEquals(target, current)
+}
+
+test.extremes.correct.2 <- function() {
+  ## normal usage on same but unsorted data
+  values <- c(7,2,8,3,1,9,6,5,4)
+  target <- c(2, 8)
+  current <- extremes(values, 3)
+  checkEquals(target, current)
+}
+

@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: utils.R 4 2010-07-08 10:36:09Z mariotomo $
+## $Id: utils.R 19 2010-08-06 15:06:01Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -54,8 +54,15 @@ na.fill <- function(object) {
   ## accepts a vector possibly holding NA values and returns a vector
   ## where all observed values are carried forward and the first is
   ## carried backward.  cfr na.locf from zoo library.
-  L <- !is.na(object)
-  c(object[L][1], object[L])[1 + cumsum(L)]
+
+  ## function looks a bit clumsy because in case the input object has
+  ## labels for entries, we want to replace only the values, keeping
+  ## all labels in place.
+  values <- as.numeric(object)
+  result <- object
+  L <- !is.na(values)
+  result[1:length(values)] <- c(values[L][1], values[L])[1 + cumsum(L)]
+  return(result)
 }
 
 na.zero <- function(object) {
@@ -65,7 +72,7 @@ na.zero <- function(object) {
   result
 }
 
-na.interpolate <- function(object) 
+na.interpolate <- function(object)
   ## TODO
   object
 
@@ -94,31 +101,10 @@ stretches <- function(input, gap=1, what="start", zero.surrounded=FALSE) {
   return(result)
 }
 
-rollapply <- function(data, count, fun, na.action=na.pass) {
-  ## returns the rolling application of `fun` to data (nth element in
-  ## returned vector is `fun` of count elements in data from n-count
-  ## to n.)
-
-  ## count must be positive.
-  ## result is same length as data (starts with `count-1` NA).
-
-  data <- na.action(data)
-  len <- length(data)
-  if(count < 1) {
-    ## Only positive count allowed
-    return(rep(NA, len))  
-  }
-  if(count > len) {
-    rep(NA, len)
-  } else {
-    c( rep(NA, count - 1) , apply(embed(data, count), 1, fun) )
-  }
-}
-
-rollingSum <- function(data, count, na.action=na.zero) {
+rollingSum <- function(data, width, na.action=na.zero) {
   ## commodity function
   ## na.zero specifies that NA will be summed as zero.
-  rollapply(data, count, fun=sum, na.action=na.action)
+  rollapply(na.action(data), width, FUN=sum)
 }
 
 shift.vector <- function(v, by) {
@@ -136,8 +122,10 @@ shift.vector <- function(v, by) {
     c(v[(-by + 1):(length(v) - by)])
 }
 
-contiguous.stretch <- function(data, value, position, equality=TRUE) {
+contiguous.stretch <- function(data, position, value=NULL, equality=TRUE) {
   ## zie http://stackoverflow.com/questions/2643719
+  if(is.null(value))
+    value <- data[position]
   if (position < 1 || position > length(data))
     return(rep(FALSE, length(data)))
   if(equality)
@@ -151,6 +139,8 @@ contiguous.stretch <- function(data, value, position, equality=TRUE) {
 }
 
 get.step <- function(L, require.constant=FALSE) {
+  ## not exported, tested.
+
   ## returns the value of the most common difference between
   ## subsequent elements.
 
@@ -167,7 +157,116 @@ get.step <- function(L, require.constant=FALSE) {
 }
 
 sum.first <- function(input, count=12) {
+  ## not exported, not tested.
+
   ## accepts a data.frame and returns the vector of the sum of the
   ## first 12 rows of each column
-  sapply(input[1:12,], sum)
+  colSums(input[1:count,])
 }
+
+rollapply.default <- function(data, width, FUN, ...) {
+  ## returns the rolling application of `FUN` to data (nth element in
+  ## returned vector is `FUN` of width elements in data from n-width
+  ## to n.)
+
+  apply.na.action <- function(data, na.action=na.pass, ...) na.action(data)
+  data <- apply.na.action(data, ...)
+
+  ## width must be positive.
+  ## result is same length as data (starts with `width-1` NA).
+
+  len <- length(data)
+  if(width < 1) {
+    ## Only positive width allowed
+    return(rep(NA, len))
+  }
+  if(width > len) {
+    rep(NA, len)
+  } else {
+    c( rep(NA, width - 1) , apply(embed(data, width), 1, FUN) )
+  }
+}
+
+double.threshold <- function(data, threshold.false, threshold.true, initial.status)
+  UseMethod('double.threshold')
+
+double.threshold.default <- function(data, threshold.false, threshold.true, initial.status=FALSE) {
+  ## double threshold test.
+
+  ## looks at data as a sequence of values and returns a boolean that
+  ## tells whether we are between the two threshold values.
+
+  s <- rep(NA, length(data))
+  s[1] <- initial.status
+  s[data > threshold.true] <- TRUE
+  s[data < threshold.false] <- FALSE
+  L <- !is.na(s)
+  s[L][cumsum(L)]
+}
+
+double.threshold.data.frame <- function(data, ...) {
+  ## applies double.threshold.default to each column of the input
+  ## data.frame
+
+  data.frame(apply(data, 2, double.threshold, ...))
+}
+
+double.threshold.matrix <- function(data, ...) {
+  ## applies double.threshold.default to each column of the input
+  ## matrix
+
+  apply(data, 2, double.threshold, ...)
+}
+
+multi.double.threshold <- function(data, thresholds, initial.status)
+  UseMethod('multi.double.threshold')
+
+multi.double.threshold.default <- function(data, thresholds, initial.status=FALSE) {
+  ## multiple double threshold test.  similar to above
+  ## double.threshold, but this one counts the amount of thresholds
+  ## being exceeded.
+
+  ## `thresholds` is a data.frame with two columns named
+  ## "threshold.false" and "threshold.true".
+
+  apply.threshold.row <- function(threshold.row, data, ...) {
+    threshold.false <- threshold.row[1]
+    threshold.true <- threshold.row[2]
+    double.threshold(data, threshold.false, threshold.true, ...)
+  }
+
+  apply(apply(thresholds, 1, apply.threshold.row, data=data, initial.status=initial.status), 1, sum)
+}
+
+multi.double.threshold.data.frame <- function(data, ...) {
+  ## applies multi.double.threshold.default to each column of the input
+  ## data.frame
+
+  data.frame(apply(data, 2, multi.double.threshold, ...))
+}
+
+multi.double.threshold.matrix <- function(data, ...) {
+  ## applies multi.double.threshold.default to each column of the input
+  ## matrix
+
+  apply(data, 2, multi.double.threshold, ...)
+}
+
+
+extremes <- function(x, count) {
+  ## returns the averages of the `count` highest and lowest values of
+  ## vector `x`.
+
+  sorted <- sort(x)
+  N <- length(x)
+
+  c(mean(sorted[1:3]), mean(sorted[(N-2):N]))
+}
+
+## not really necessary, but possibly useful
+edit.zoo <- function(x) {
+  cd <- coredata(x)
+  rownames(cd) <- index(x)
+  zoo(edit(cd), order.by=index(x))
+}
+

@@ -1,8 +1,10 @@
-% $Id: timeseries.Rd 2 2010-07-07 13:40:59Z mariotomo $
+% $Id: timeseries.Rd 19 2010-08-06 15:06:01Z mariotomo $
 
 \name{timeseries}
 \alias{timeseries}
-\title{creates a data.frame that is a time series set}
+\alias{[.delftfews}
+\alias{[<-.delftfews}
+\title{overriding zoo creator and accessors}
 \description{
   
   using three of the four \code{from}, \code{to}, \code{by},
@@ -21,7 +23,7 @@
   
 }
 \usage{
-timeseries(from, to, by, length.out, ...)
+timeseries(from, to, by, length.out, order.by, ...)
 }
 \arguments{
   \item{from}{the starting instant of the resulting time series.
@@ -32,6 +34,9 @@ timeseries(from, to, by, length.out, ...)
     \code{numeric}}
   \item{length.out}{if specified, ensures the resulting timeseries
     contains \code{length.out} elements (\code{length.out - 1} steps).}
+  \item{order.by}{if specified, the resulting timeseries uses these
+    timestamps as index instead of building its own from the above
+    described four parameters.}
   \item{...}{any other named field is added as field in the resulting
     timeseries.  the lenght must match the \code{length.out} parameter.}
 }

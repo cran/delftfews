@@ -1,32 +1,25 @@
 % File src/R/man/rollingSum.Rd
-% $Id: rollingSum.Rd 2 2010-07-07 13:40:59Z mariotomo $
+% $Id: rollingSum.Rd 19 2010-08-06 15:06:01Z mariotomo $
 
 \name{rollingSum}
-\alias{rollapply}
 \alias{rollingSum}
+\alias{rollapply.default}
 \title{apply aggregating functions to contiguous stretches of data}
 \description{  
 
-  returns the rolling application of `fun` to input (`n`th element in
-  returned vector is `fun` of `count` elements in input from `n - count`
-  to `n`.)
+  `rollingSum` is a commodity function invoking `zoo::rollapply` with
+  `FUN=sum`.
 
-  count must be positive.
-  result is same length as input (starts with `count-1` NA).
-
-  commodity function `rollingSum` invokes `rollapply` with `fun=sum`.
-  `na.action` defaults to `na.pass` for `rollapply` and to `na.zero` for
-  `rollingSum`.
+  `zoo::rollapply` does not define a default method.  we do so in
+  delftfews.
 
 }
 \usage{
-rollapply(data, count, fun, na.action=na.pass)
-rollingSum(data, count, na.action=na.zero)
+rollingSum(data, width, na.action=na.zero)
 }
 \arguments{
   \item{data}{the input data vector with instantaneous values}
-  \item{count}{the number of values of the sum.}
-  \item{fun}{the function to apply to the elements in the stretch.}
+  \item{width}{the number of values of the sum.}
   \item{na.action}{what to do with NA values.}
 }
 \examples{
@@ -38,20 +31,11 @@ input <- c(rep(1:3, 2), NA)
 rollingSum(input, 2)
 # [1] NA  3  5  4  3  5  3
 
-# as above, but average without filling in NA elements:
-rollapply(input, 2, mean)
-# [1] NA 1.5 2.5 2.0 1.5 2.5  NA
-
 # the three elements [i-2, i-1, i]
 rollingSum(input, 3)
 # [1] NA NA  6  6  6  6  5
 
 rollingSum(input, 4)
-# notice how the first `count - 1` elements in the result are NA
+# notice how the first `width - 1` elements in the result are NA
 # [1] NA NA NA  7  8  9  6
-
-rollapply(input, 4, mean)
-# [1]   NA   NA   NA 1.75 2.00 2.25   NA
-rollapply(input, 4, mean, na.action=na.zero)
-# [1]   NA   NA   NA 1.75 2.00 2.25 1.50
 }

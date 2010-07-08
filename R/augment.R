@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: augment.R 4 2010-07-08 10:36:09Z mariotomo $
+## $Id: augment.R 19 2010-08-06 15:06:01Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -24,25 +24,41 @@
 ## initial date       :  20091120
 ##
 
-timeseries <- function(from=NULL, to=NULL, by=NULL, length.out=NULL, ...) {
-  ## builds a minimal time series data.frame
+timeseries <- function(from=NULL, to=NULL, by=NULL, length.out=NULL, order.by=NULL, ...) {
+  ## builds a minimal time-series-set zoo object
 
-  from <- as.seconds(from)
-  to <- as.seconds(to)
-  by <- as.seconds(by)
+  if(!is.null(order.by)) {
+    timestamps <- order.by
+  } else {
 
-  if(is.null(to))
-    to <- from + by * (length.out - 1)
-  else if(is.null(by))
-    by <- (to - from) / (length.out - 1)
-  else if(is.null(from))
-    from <- to - by * (length.out - 1)
+    from <- as.seconds(from)
+    to <- as.seconds(to)
+    by <- as.seconds(by)
 
-  seconds <- seq(from=from, to=to, by=by)
+    if(is.null(to))
+      to <- from + by * (length.out - 1)
+    else if(is.null(by))
+      by <- (to - from) / (length.out - 1)
+    else if(is.null(from))
+      from <- to - by * (length.out - 1)
 
-  timestamps <- as.POSIXct.seconds(seconds, origin=EPOCH)
+    timestamps <- as.POSIXct.seconds(seq(from=from, to=to, by=by), origin=EPOCH)
+  }
 
-  data.frame(timestamps=timestamps, ...)
+  result <- zoo(data.frame(...), order.by=timestamps)
+  ## we make no use of rowname information, they only confuse our tests.
+  rownames(result) <- NULL
+  ## following trick allows us override specific methods
+  class(result) <- c("delftfews", class(result))
+
+  params <- list(...)
+  if(length(params) == 1) {
+    input <- params[[1]]
+    if(is.matrix(input) || is.data.frame(input))
+      names(result) <- colnames(input)
+  }
+
+  return(result)
 }
 
 cumulate.timeseries <- function(input, column="input", gap=1, integration.method=3, units="secs") {
@@ -54,7 +70,7 @@ cumulate.timeseries <- function(input, column="input", gap=1, integration.method
   ## 4: simpson's.  the methods are implemented taking into account
   ## the two 0 measurements outside the stretch under examination.
 
-  result <- input
+  result <- data.frame(row.names=1:nrow(input))
   result[[paste(column, 'gross', 'partials', sep='.')]] <- NA
   result[[paste(column, 'gross', 'totals', sep='.')]] <- NA
   result[[paste(column, 'gross', 'duration', sep='.')]] <- NA
@@ -64,24 +80,24 @@ cumulate.timeseries <- function(input, column="input", gap=1, integration.method
   result[[paste(column, 'net', 'duration', sep='.')]] <- NA
 
   augment <- function(start, end, type) {
-    start.ts <- input$timestamps[start]
-    if(end >= length(input$timestamps)) {
-      end.ts <- input$timestamps[end] + (input$timestamps[end] - input$timestamps[end - 1])
-      timestamps <- input$timestamps[start:end]
+    start.ts <- index(input)[start]
+    if(end >= nrow(input)) {
+      end.ts <- index(input)[end] + (index(input)[end] - index(input)[end - 1])
+      timestamps <- index(input)[start:end]
       timestamps <- c(timestamps, end.ts)
     } else {
-      end.ts <- input$timestamps[end+1]
-      timestamps <- input$timestamps[start:(end+1)]
+      end.ts <- index(input)[end+1]
+      timestamps <- index(input)[start:(end+1)]
     }
 
     ## prepare local data that is used more than once
     intervals <- as.double(diff(timestamps), units=units)
     if (integration.method == 1) {
       ## rectangular, top left
-      values <- result[[column]][start:end]
+      values <- input[start:end, column]
     } else if (integration.method == 3) {
       ## trapezoid
-      values <- rollapply(c(0, result[[column]][start:end], 0), 2, mean, na.action=na.zero)[-1]
+      values <- rollapply(c(0, input[start:end, column], 0), 2, mean, na.action=na.zero)[-1]
       intervals[length(intervals) + 1] <- intervals[length(intervals)]
       end <- end + 1
     } else {
@@ -96,38 +112,13 @@ cumulate.timeseries <- function(input, column="input", gap=1, integration.method
   }
 
   mapply(augment,
-         stretches(result[[column]], what="start", zero.surrounded=TRUE),
-         stretches(result[[column]], what="end", zero.surrounded=TRUE),
+         stretches(input[, column], what="start", zero.surrounded=TRUE),
+         stretches(input[, column], what="end", zero.surrounded=TRUE),
          MoreArgs=list(type="net"))
   mapply(augment,
-         stretches(result[[column]], gap, what="start", zero.surrounded=TRUE),
-         stretches(result[[column]], gap, what="end", zero.surrounded=TRUE),
+         stretches(input[, column], gap, what="start", zero.surrounded=TRUE),
+         stretches(input[, column], gap, what="end", zero.surrounded=TRUE),
          MoreArgs=list(type="gross"))
 
-  result
-}
-
-select.percentiles <- function(input, percentiles, score.function=sum.first, ...) {
-  ## assuming 'input' contains some sort of monte carlo realizations
-  ## of the same experiment in timeseries format, this function
-  ## chooses the percentiles indicated, after the `score.function` function
-  ## has applied to each column.
-
-  ## first column contains timestamps, don't count it
-  N <- length(input) - 1
-  ## call the score.function, passing it any extra parameters
-  tempdata <- score.function(input[(1:N)+1], ...)
-  ## set names numerically so we can find back the columns
-  names(tempdata) <- 1:N
-  ## these are the columns.  don't forget skipping the timestamps
-  ## column.
-  columns <- as.numeric(names(sort(tempdata)[N * percentiles / 100])) + 1
-
-  ## result has the same timestamps as input, plus the columns just
-  ## chosen.
-  result <- data.frame(timestamps=input$timestamps)
-  result[paste(names(input)[columns], percentiles, sep='.')] <- input[columns]
-
-  ## done
-  return(result)
+  cbind(input, zoo(result, index(input)))
 }

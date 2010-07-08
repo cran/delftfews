@@ -1,5 +1,5 @@
 ##***********************************************************************
-## $Id: timeseries-io.R 4 2010-07-08 10:36:09Z mariotomo $
+## $Id: timeseries-io.R 19 2010-08-06 15:06:01Z mariotomo $
 ##
 ## this file is part of the R library delftfews.  delftfews is free
 ## software: you can redistribute it and/or modify it under the terms
@@ -63,8 +63,10 @@ read.PI <- function(filename, step.seconds=NA, na.action=na.fill) {
   doc <- xmlTreeParse(filename)
   TimeSeriesNode <- xmlRoot(doc)
 
-  ## we only operate on the "series" nodes.
+  ## time offset in seconds from the timeZone element (which is in hours)
+  timeOffset <- as.double(xmlValue(TimeSeriesNode[["timeZone"]])) * 60 * 60
 
+  ## we only operate on the "series" nodes.
   seriesNodes <- xmlElementsByTagName(TimeSeriesNode, "series")
 
   ## reset the name of the elements in seriesNodes from the general
@@ -110,12 +112,10 @@ read.PI <- function(filename, step.seconds=NA, na.action=na.fill) {
   first <- floor(startsAndEnds[1]/step.seconds)*step.seconds
   last <- ceiling(startsAndEnds[2]/step.seconds)*step.seconds
 
-  ## result data.frame holds one $timestamps column, meant for both
-  ## computation and human readability of the data.
-  result <- data.frame(timestamps=EPOCH + seq(from=first, to=last, by=step.seconds))
+  ## result zoo is indexed on timestamps.  you can retrieve them using the `index` function.
+  result.index <- EPOCH + seq(from=first, to=last, by=step.seconds) - timeOffset
 
   ## finally extract all the timestamped values and fill in the blanks
-
   getValues <- function(node) {
     ## get the values as a named column
     header <- xmlElementsByTagName(node, "header")[[1]]
@@ -132,16 +132,27 @@ read.PI <- function(filename, step.seconds=NA, na.action=na.fill) {
     seconds <- as.numeric(difftime(timestamps, EPOCH, tz="UTC"), units="secs")
 
     grouped <- groupByStep(seconds, values, step.seconds, flags, missVal)
-    column <- rep(NA, length(result$timestamps))
-    column[as.seconds(result$timestamps) %in% grouped$s] <- grouped$v
+    column <- rep(NA, length(result.index))
+    column[as.seconds(result.index) %in% (grouped$s - timeOffset)] <- grouped$v
     na.action(column)
   }
 
   ## column-bind the timestamps to the collected values
-  cbind(result, mapply(getValues, seriesNodes))
+  result <- zoo(cbind(mapply(getValues, seriesNodes), check.names=FALSE), order.by=result.index)
+  class(result) <- c("delftfews", class(result))
+  return(result)
 }
 
-write.PI <- function(data, data.description, filename, global.data=NA) {
+write.PI <- function(data, data.description, filename, global.data) 
+  ## generic function, saves a timeseriesset to a file
+  UseMethod('write.PI')
+
+write.PI.data.frame <- function(data, data.description, filename, global.data=NA) {
+  data <- zoo(data[-1], order.by=data$timestamps)
+  return(write.PI.zoo(data, data.description, filename, global.data=global.data))
+}
+
+write.PI.zoo <- function(data, data.description, filename, global.data=NA) {
   ## exports parts of the data data.frame to the XML filename
 
   ## data.description is a data.frame, looking like this:
@@ -150,7 +161,7 @@ write.PI <- function(data, data.description, filename, global.data=NA) {
   ##1 instantaneous 155 Ai2 -999.0 m^3/min result
   ##2 instantaneous 156 Ai3 -999.0 mmHg check
 
-  timeStep <- get.step(data$timestamps)
+  timeStep <- get.step(index(data))
 
   looksLikeNULL <- function(object, name) {
     if(!(name %in% names(object)))
@@ -170,8 +181,8 @@ write.PI <- function(data, data.description, filename, global.data=NA) {
     ## 'event' nodes
 
     ## cut uninteresting columns
-    actualdata <- data.frame(seconds = as.seconds(data[[1]]))
-    actualdata$column <- data[[ item[['column']] ]]
+    actualdata <- data.frame(seconds = as.seconds(index(data)))
+    actualdata$column <- data[ , item[['column']] ]
     ## cut rows that generate no 'event' node.
     if(looksLikeNULL(item, 'missVal')) {
       actualdata <- subset(actualdata, !is.na(column))
@@ -213,7 +224,7 @@ write.PI <- function(data, data.description, filename, global.data=NA) {
         xmlNode(name = 'event', attrs=c(date=tsDate(ts), time=tsTime(ts), value=value, flag=0))
     }
 
-    if(length(data[[1]]) != length(actualdata[[1]])) # we removed rows
+    if(nrow(data) != nrow(actualdata)) # we removed rows
       timeStepNode <- xmlNode('timeStep', attrs=c(unit="nonequidistant"))
     else
       timeStepNode <- xmlNode('timeStep', attrs=c(unit="seconds", multiplier=timeStep))
@@ -272,13 +283,13 @@ read.BfG <- function(filename, column="value") {
   Q$timestamps <- as.POSIXct(paste(dates, times), "%Y-%m-%d %H:%M:%S", tz="UTC")
 
   ## remove the original first four columns, set 'timestamps' as the first column.
-  return(Q[c('timestamps', column)])
+  return(Q[column], Q$timestamps)
 }
 
 splitToNumeric <- function(x) {
   ## translates a string configuration submatrix to numeric
   
-  ## not exported
+  ## not exported, tested
 
   ow <- options("warn")
   options(warn=-1)

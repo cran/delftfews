@@ -1,11 +1,14 @@
 % File src/R/man/NenS-package.Rd
-% $Id: delftfews-package.Rd 2 2010-07-07 13:40:59Z mariotomo $
+% $Id: delftfews-package.Rd 19 2010-08-06 15:06:01Z mariotomo $
 
 \name{NenS-package}
 \Rdversion{1.1}
 \alias{NenS-package}
 \alias{NenS}
 \alias{delftfews}
+\alias{[.zoo}
+\alias{[<-.zoo}
+\alias{$<-.zoo}
 \docType{package}
 \title{
 alfa version of delftfews
